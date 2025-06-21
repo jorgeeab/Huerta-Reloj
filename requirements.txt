@@ -1,0 +1,14 @@
+flask
+flask-cors
+flask-sqlalchemy
+requests
+gym
+numpy
+pandas
+openpyxl
+pygame
+pyserial
+pyserial-asyncio
+simple-pid
+pybullet
+matplotlib
