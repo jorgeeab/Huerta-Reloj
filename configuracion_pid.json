@@ -1,0 +1,10 @@
+{
+    "kpX": 2.0,
+    "kiX": 0.5,
+    "kdX": 0.2,
+    "kpA": 2.5,
+    "kiA": 0.6,
+    "kdA": 0.3,
+    "stepsPerMM": 0.0,
+    "stepsPerDegree": 2.7777777777777777
+}
