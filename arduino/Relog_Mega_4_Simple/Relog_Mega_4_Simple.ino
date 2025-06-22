@@ -16,6 +16,8 @@ float volumen = 0.0;
 float Vol_requerido = 0;
 int resetVolumen = 0;
 int modoManual = 0;
+bool usarLectorVelocidad = true;  // true: usar sensor de flujo, false: controlar por tiempo
+unsigned long tiempoInicioValvula = 0;  // Para control por tiempo
 
 const int limMaxX = 400;  // Límite máximo en mm para corredera
 
@@ -114,6 +116,8 @@ void loop() {
 }
 
 void leerSensorFlujo() {
+  if (!usarLectorVelocidad) return;
+
   unsigned long currentMillis = millis();
   if (currentMillis - lastUpdateTimeFlow >= updateIntervalFlowPID) {
     unsigned long deltaMillis = currentMillis - lastUpdateTimeFlow;
@@ -307,13 +311,31 @@ void controlar_motores_PID() {
   adjusted_EMA = remapEnergy(adjusted_EMA);
   EMV = remapEnergy(EMV);
 
-  // Controlar el volumen usando el motor de la bomba (motorV)
-  if (volumen < Vol_requerido) {
-    motorV.setSpeed(255); // Ajustar la velocidad de la bomba
-    motorV.run(FORWARD);  // Mantener la bomba encendida
+  // Controlar el volumen usando el sensor o solo por tiempo
+  if (usarLectorVelocidad) {
+    if (volumen < Vol_requerido) {
+      motorV.setSpeed(255);
+      motorV.run(FORWARD);
+    } else {
+      motorV.setSpeed(0);
+      motorV.run(RELEASE);
+    }
   } else {
-    motorV.setSpeed(0);   // Detener la bomba una vez alcanzado el volumen requerido
-    motorV.run(RELEASE);
+    if (Vol_requerido > 0) {
+      if (tiempoInicioValvula == 0) tiempoInicioValvula = millis();
+      if (millis() - tiempoInicioValvula < (unsigned long)(Vol_requerido * 1000)) {
+        motorV.setSpeed(255);
+        motorV.run(FORWARD);
+      } else {
+        motorV.setSpeed(0);
+        motorV.run(RELEASE);
+        Vol_requerido = 0;
+        tiempoInicioValvula = 0;
+      }
+    } else {
+      motorV.setSpeed(0);
+      motorV.run(RELEASE);
+    }
   }
 
   // Configurar las velocidades de los motores
@@ -414,6 +436,7 @@ void procesarComando(String command) {
   // Procesar valores de calibración
   float newStepsPerMM = values[16].toFloat();      // Calibración en pasos por milímetro
   float newStepsPerDegree = values[17].toFloat();  // Calibración en pasos por grado
+  usarLectorVelocidad = values[18].toInt() == 1;
 
   // Asegurarse de que no sean cero para evitar divisiones por cero
   if (newStepsPerMM != 0) stepsPerMM = newStepsPerMM;
@@ -429,6 +452,7 @@ void procesarComando(String command) {
     // Reiniciar el volumen acumulado
     Meter->reset();
     volumen = 0.0; // Reiniciar el volumen en el código
+    tiempoInicioValvula = 0;
   }
 
 
