@@ -41,7 +41,7 @@ class BasicEnv(gym.Env):
                 0,      # [15] resetMotorAFlag
                 0,      # [16] stepsPerMM
                 0,      # [17] stepsPerDegree
-                0,      # [18] (valor no utilizado)
+                0,      # [18] usarSensorVelocidad (1 o 0)
                 0       # [19] (valor no utilizado)
             ]),
             high=np.array([
@@ -63,13 +63,14 @@ class BasicEnv(gym.Env):
                 1,      # [15] resetMotorAFlag
                 10000,  # [16] stepsPerMM
                 10000,  # [17] stepsPerDegree
-                0,      # [18] (valor no utilizado)
+                1,      # [18] usarSensorVelocidad
                 0       # [19] (valor no utilizado)
             ]),
             dtype=np.float32
         )
 
         self.current_action = np.zeros(20)  # Tamaño ajustado a 20 variables
+        self.current_action[18] = 1  # usar sensor de velocidad por defecto
 
         self.variable_names = [
             'inputX',           # [0]
@@ -497,7 +498,7 @@ class BasicEnv(gym.Env):
             int(self.current_action[15]),  # resetMotorAFlag
             float(self.current_action[16]),  # stepsPerMM
             float(self.current_action[17]),  # stepsPerDegree
-            0,  # Valor no utilizado
+            int(self.current_action[18]),  # usarSensorVelocidad
             0  # Valor no utilizado
         ]
 
@@ -719,6 +720,9 @@ class BasicEnv(gym.Env):
 
     def set_manual_mode(self, manual_mode):
         self.current_action[0] = int(manual_mode)
+
+    def set_use_speed_sensor(self, flag):
+        self.current_action[18] = 1 if flag else 0
 
     def reset_volumen(self):
         self.current_action[13] = 1  # Establecer la bandera para reiniciar el volumen
