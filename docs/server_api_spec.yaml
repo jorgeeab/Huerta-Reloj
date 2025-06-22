@@ -1,0 +1,246 @@
+openapi: 3.1.0
+info:
+  title: Servidor de Protocolos
+  version: 1.0.0
+  description: API para gestionar y ejecutar protocolos en un entorno controlado.
+servers:
+  - url: https://8ab7-190-171-112-243.ngrok-free.app
+    description: Servidor local para pruebas
+
+paths:
+  /update_protocol_code:
+    post:
+      summary: Actualizar código del protocolo
+      description: Actualiza el código de un protocolo existente y lo reactiva si está activo.
+      operationId: update_protocol_code
+      x-isConsequential: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: ID del protocolo a actualizar.
+                code:
+                  type: string
+                  description: Nuevo código Python del protocolo.
+              example:
+                id: protocolo1
+                code: |
+                  def protocol_init(env):
+                      pass
+                  def protocol_main(env):
+                      return 1
+                  def protocol_end(env):
+                      pass
+      responses:
+        '200':
+          description: Código actualizado exitosamente.
+          content:
+            application/json:
+              example:
+                message: "Código del protocolo 'protocolo1' actualizado correctamente."
+                observaciones: []
+        '400':
+          description: Error al actualizar el código del protocolo.
+  /stop:
+    post:
+      summary: Detener protocolos y motores
+      description: Detiene cualquier protocolo activo y desactiva los motores del entorno.
+      operationId: stop
+      x-isConsequential: false
+      responses:
+        '200':
+          description: Motores detenidos y protocolo desactivado.
+          content:
+            application/json:
+              example:
+                message: "Motores detenidos exitosamente."
+        '400':
+          description: Error al detener los motores.
+
+  /update_actuators:
+    post:
+      summary: Actualizar actuadores
+      description: Actualiza los actuadores del entorno según los valores proporcionados en el cuerpo de la solicitud.
+      operationId: update_actuators
+      x-isConsequential: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                modoManual:
+                  type: integer
+                  description: Modo manual activado o desactivado.
+                X_Requerido:
+                  type: number
+                  description: Posición X requerida.
+              example:
+                modoManual: 1
+                X_Requerido: 10.5
+      responses:
+        '200':
+          description: Accion actualizada con éxito.
+          content:
+            application/json:
+              example:
+                message: "Acción actualizada con éxito."
+                action: [0, 1, 0, 10.5, 0]
+                observation:
+                  X: 10.5
+                  Y: 0.0
+                reward: 1.0
+                done: false
+        '400':
+          description: Error al actualizar actuadores.
+
+  /list_protocols:
+    get:
+      summary: Listar protocolos
+      description: Devuelve una lista de protocolos disponibles en el sistema.
+      operationId: list_protocols
+      x-isConsequential: false
+      responses:
+        '200':
+          description: Lista de protocolos disponibles.
+          content:
+            application/json:
+              example:
+                - id: protocolo1
+                  description: "Protocolo de prueba 1"
+                - id: protocolo2
+                  description: "Protocolo de prueba 2"
+        '404':
+          description: No se encontraron protocolos.
+
+  /create_protocol:
+    post:
+      summary: Crear un protocolo
+      description: Crea un nuevo protocolo en el sistema.
+      operationId: create_protocol
+      x-isConsequential: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: ID único del protocolo.
+                code:
+                  type: string
+                  description: Código Python del protocolo.
+                description:
+                  type: string
+                  description: Descripción del protocolo.
+              example:
+                id: protocolo3
+                code: |
+                  def protocol_init(env):
+                      pass
+                  def protocol_main(env):
+                      return 0
+                  def protocol_end(env):
+                      pass
+                description: "Protocolo de prueba 3"
+      responses:
+        '200':
+          description: Protocolo creado exitosamente.
+          content:
+            application/json:
+              example:
+                message: "Protocolo 'protocolo3' creado con éxito."
+        '400':
+          description: Error al crear el protocolo.
+
+  /activate_protocol:
+    post:
+      summary: Activar un protocolo
+      description: Activa un protocolo específico en el entorno.
+      operationId: activate_protocol
+      x-isConsequential: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: ID del protocolo a activar.
+              example:
+                id: protocolo1
+      responses:
+        '200':
+          description: Protocolo activado exitosamente.
+          content:
+            application/json:
+              example:
+                message: "Protocolo 'protocolo1' activado."
+                observaciones: []
+        '404':
+          description: Protocolo no encontrado.
+
+  /view_protocol/{pid}:
+    get:
+      summary: Ver protocolo
+      description: Devuelve el código y la descripción de un protocolo específico.
+      operationId: view_protocol
+      x-isConsequential: false
+      parameters:
+        - name: pid
+          in: path
+          required: true
+          description: ID del protocolo.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Información del protocolo.
+          content:
+            application/json:
+              example:
+                id: protocolo1
+                code: |
+                  def protocol_init(env):
+                      pass
+                  def protocol_main(env):
+                      return 0
+                  def protocol_end(env):
+                      pass
+                description: "Protocolo de prueba 1"
+        '404':
+          description: Protocolo no encontrado.
+
+  /delete_protocol/{pid}:
+    delete:
+      summary: Eliminar protocolo
+      description: Elimina un protocolo de la memoria y la base de datos.
+      operationId: delete_protocol
+      x-isConsequential: false
+      parameters:
+        - name: pid
+          in: path
+          required: true
+          description: ID del protocolo.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Protocolo eliminado exitosamente.
+          content:
+            application/json:
+              example:
+                message: "Protocolo 'protocolo1' eliminado con éxito."
+        '404':
+          description: Protocolo no encontrado.
+
