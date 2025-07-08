@@ -1,108 +1,97 @@
-
+import matplotlib.pyplot as plt
+from openpyxl import load_workbook
+from .plantas import PlantasManager
+from .regimenes import RegimenesManager
+from .ensayos import EnsayosEnv
+#from .utils import crear_archivos_plantas_y_regimenes
 import pygame
 import numpy as np
 import gym
 import serial
 import threading
 import time
-import sqlite3
-import json
+import queue
+import csv
+import matplotlib.pyplot as plt
+from openpyxl import load_workbook
+import pygame
 
 class BasicEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, port='COM6', baudrate=115200):
+    def __init__(self, port='COM6', baudrate=115200,
+                 archivo_plantas='archivo_plantas.xlsx',
+                 archivo_regimenes='archivo_regimenes.xlsx',
+                 archivo_ensayos='archivo_ensayos.xlsx'):
         super(BasicEnv, self).__init__()
-        self.start_time = time.time()
 
+        # Inicializar gestores de plantas y regímenes
+        self.plantas_manager = PlantasManager(archivo_plantas)
+        self.regimenes_manager = RegimenesManager(archivo_regimenes)
+        self.ensayos_env = EnsayosEnv(archivo_plantas, archivo_regimenes, archivo_ensayos)
 
-        # Inicializar current_batch como None
-        self.current_batch = None  # Inicializado como None
-        self.stop_thread = False  # Nueva variable de control para detener el hilo
-
-
+        # Definir espacios de acción y observación
         self.action_space = gym.spaces.Box(
             low=np.array([
                 0,      # [0] modoManual (0 o 1)
-                -255,   # [1] EMA (control manual del motor angular)
-                -255,   # [2] EMX (control manual del motor lineal)
-                -255,   # [3] EMV (control manual de la bomba)
+                -255,   # [1] manualMotorA
+                -255,   # [2] manualMotorX
+                -255,   # [3] manualMotorV
                 0,      # [4] X_Requerido
                 0,      # [5] A_Requerido
-                0,      # [6] Vol_requerido
+                0,      # [6] Vel_Requerida
                 0,      # [7] kpX
                 0,      # [8] kiX
                 0,      # [9] kdX
                 0,      # [10] kpA
                 0,      # [11] kiA
                 0,      # [12] kdA
-                0,      # [13] resetVolumen
-                0,      # [14] resetMotorXFlag
-                0,      # [15] resetMotorAFlag
-                0,      # [16] stepsPerMM
-                0,      # [17] stepsPerDegree
-                0,      # [18] usarSensorVelocidad (1 o 0)
-                0       # [19] (valor no utilizado)
+                0,      # [13] kpV
+                0,      # [14] kiV
+                0,      # [15] kdV
+                0,      # [16] resetMotorXFlag
+                0,      # [17] resetMotorAFlag
+                0,      # [18] stepsPerMM
+                0       # [19] stepsPerDegree
             ]),
             high=np.array([
                 1,      # [0] modoManual
-                255,    # [1] EMA
-                255,    # [2] EMX
-                255,    # [3] EMV
+                255,    # [1] manualMotorA
+                255,    # [2] manualMotorX
+                255,    # [3] manualMotorV
                 400,    # [4] X_Requerido
                 360,    # [5] A_Requerido
-                1000,   # [6] Vol_requerido
+                255,    # [6] Vel_Requerida
                 255,    # [7] kpX
                 255,    # [8] kiX
                 255,    # [9] kdX
                 255,    # [10] kpA
                 255,    # [11] kiA
                 255,    # [12] kdA
-                1,      # [13] resetVolumen
-                1,      # [14] resetMotorXFlag
-                1,      # [15] resetMotorAFlag
-                10000,  # [16] stepsPerMM
-                10000,  # [17] stepsPerDegree
-                1,      # [18] usarSensorVelocidad
-                0       # [19] (valor no utilizado)
+                255,    # [13] kpV
+                255,    # [14] kiV
+                255,    # [15] kdV
+                1,      # [16] resetMotorXFlag
+                1,      # [17] resetMotorAFlag
+                10000,  # [18] stepsPerMM
+                10000   # [19] stepsPerDegree
             ]),
             dtype=np.float32
         )
 
-        self.current_action = np.zeros(20)  # Tamaño ajustado a 20 variables
-        self.current_action[18] = 1  # usar sensor de velocidad por defecto
-
-        self.variable_names = [
-            'inputX',           # [0]
-            'inputA',           # [1]
-            'volumen',          # [2]
-            'flow',             # [3]
-            'XLimit_State',     # [4]
-            'ALimit_State',     # [5]
-            'calibrandoX',      # [6]
-            'calibrandoA',      # [7]
-            'EMX',              # [8]
-            'EMA',              # [9]
-            'EMV',              # [10]
-            'modoManual',       # [11]
-            'kpX',              # [12]
-            'kiX',              # [13]
-            'kdX',              # [14]
-            'kpA',              # [15]
-            'kiA',              # [16]
-            'kdA',              # [17]
-            'stepsPerMM',       # [18]
-            'stepsPerDegree',   # [19]
-            'flowCalibFactor',   # [20]
-            #'execution_time'  # [21] <-- Nuevo valor
-        ]
+        self.current_action = np.zeros(20)  # Tamaño ajustado a 20
 
         self.observation_space = gym.spaces.Box(
             low=-np.inf,
             high=np.inf,
-            shape=(22,),  # Tamaño ajustado a 22 variables
+            shape=(24,),  # Tamaño ajustado a 24 variables
             dtype=np.float32
         )
+
+        # Inicializar cola de datos y conexión serial
+        self.data_queue = queue.Queue()
+        self.stop_thread = False
+        self.start_time = time.time()
 
         # Conectar al puerto serial y comenzar el hilo de lectura
         self.port = port
@@ -113,262 +102,57 @@ class BasicEnv(gym.Env):
         self.read_thread.daemon = True
         self.read_thread.start()
 
+        self.simulation_time = 0  # Tiempo de simulación
+        self.execution_data = []  # Datos de la ejecución actual
+
+        # Nombres de las variables
+        self.variable_names = [
+            'inputX',           # [0]
+            'inputA',           # [1]
+            'inputV',           # [2]
+            'flowVolume',       # [3]
+            'limite_X',         # [4]
+            'limite_A',         # [5]
+            'calibrando_X',     # [6]
+            'calibrando_A',     # [7]
+            'manualMotorX',     # [8]
+            'manualMotorA',     # [9]
+            'manualMotorV',     # [10]
+            'modoManual',       # [11]
+            'kpX',              # [12]
+            'kiX',              # [13]
+            'kdX',              # [14]
+            'kpA',              # [15]
+            'kiA',              # [16]
+            'kdA',              # [17]
+            'kpV',              # [18]
+            'kiV',              # [19]
+            'kdV',              # [20]
+            'stepsPerMM',       # [21]
+            'stepsPerDegree',   # [22]
+            'flowCalibFactor'   # [23]
+        ]
 
         # Inicializar pygame y joystick
         pygame.init()
         self.joystick = None
         self.joystick_connected = False
         self.check_joystick_connection()
+
+        # Variable para controlar si el joypad está habilitado
         self.joypad_enabled = False  # Comienza deshabilitado
 
         # Variable para controlar el modo (0: Automático, 1: Manual)
         self.manual_mode = 0
         self.set_manual_mode(self.manual_mode)
 
-        # Cargar las configuraciones de PID y calibraciones
-        self.config_file = 'configuracion_pid.json'
-        self.load_configurations()
-
-    def save_configurations(self):
-        """
-        Guarda las configuraciones actuales de PID y calibraciones en el archivo JSON.
-        """
-        config = {
-            'kpX': float(self.current_action[7]),  # Convertir a float estándar
-            'kiX': float(self.current_action[8]),
-            'kdX': float(self.current_action[9]),
-            'kpA': float(self.current_action[10]),
-            'kiA': float(self.current_action[11]),
-            'kdA': float(self.current_action[12]),
-            'stepsPerMM': float(self.current_action[16]),
-            'stepsPerDegree': float(self.current_action[17])
-        }
-        try:
-            with open(self.config_file, 'w') as f:
-                json.dump(config, f, indent=4)
-                print("Configuraciones guardadas en el archivo:", self.config_file)
-        except Exception as e:
-            print(f"Error al guardar las configuraciones: {e}")
-
-    def load_configurations(self):
-        """
-        Carga las configuraciones de PID y calibraciones desde el archivo JSON.
-        Si el archivo no existe, utiliza valores predeterminados.
-        """
-        try:
-            with open(self.config_file, 'r') as f:
-                config = json.load(f)
-
-                # Cargar configuraciones de PID
-                self.current_action[7:10] = [
-                    config.get('kpX', 1.0),  # kpX
-                    config.get('kiX', 0.1),  # kiX
-                    config.get('kdX', 0.05)  # kdX
-                ]
-                self.current_action[10:13] = [
-                    config.get('kpA', 1.5),  # kpA
-                    config.get('kiA', 0.3),  # kiA
-                    config.get('kdA', 0.2)  # kdA
-                ]
-
-                # Cargar calibraciones
-                self.current_action[16] = config.get('stepsPerMM', 1000.0)
-                self.current_action[17] = config.get('stepsPerDegree', 1000.0)
-
-                print("Configuraciones cargadas desde el archivo:", self.config_file)
-        except FileNotFoundError:
-            print("Archivo de configuración no encontrado. Usando valores predeterminados.")
-            # Establecer valores predeterminados
-            self.current_action[7:10] = [1.0, 0.1, 0.05]  # PID para corredera
-            self.current_action[10:13] = [1.5, 0.3, 0.2]  # PID para ángulo
-            self.current_action[16] = 1000.0  # stepsPerMM
-            self.current_action[17] = 1000.0  # stepsPerDegree
-        except Exception as e:
-            print(f"Error al cargar las configuraciones: {e}")
-
-    ###... Funciones relacionadas con la gestion de la base de datos
-    def create_table(self):
-        conn = sqlite3.connect('execution_data.db')
-        cursor = conn.cursor()
-        # Define the columns, including 'execution_time' separately
-        columns = ', '.join([f'"{name}" REAL' for name in self.variable_names] + [
-            '"execution_time" REAL',
-            '"sent_data" TEXT',
-            '"received_data" TEXT'
-        ])
-
-        sql = f'''
-        CREATE TABLE IF NOT EXISTS execution_data (
-            batch_id TEXT,
-            {columns}
-        )
-        '''
-        cursor.execute(sql)
-        conn.commit()
-        conn.close()
-
-    def start_batch(self, batch_id=None):
-        if batch_id is None:
-            batch_id = f'batch_{int(time.time())}'
-        self.current_batch = batch_id
-        self.last_batch = batch_id  # Actualiza el último batch
-        self.start_time = time.time()
-        print(f"Batch '{batch_id}' iniciado.")
-        return batch_id
-
-    def store_serial_data(self, obs_data=None, sent_data=None, received_data=None, execution_time=None):
-        """
-        Stores sent and received serial data in the database.
-        """
-        # Create a new database connection
-        conn = sqlite3.connect('execution_data.db')
-        cursor = conn.cursor()
-
-        if obs_data is not None:
-            obs_values = obs_data.tolist()
-        else:
-            obs_values = [None] * len(self.variable_names)
-
-        # Verificar que execution_time no sea None
-        if execution_time is None:
-            execution_time = time.time()
-
-        # Prepare the values for insertion
-        values = [self.current_batch] + obs_values + [execution_time, sent_data, received_data]
-        placeholders = ', '.join(['?'] * len(values))
-        columns = 'batch_id, ' + ', '.join(
-            [f'"{name}"' for name in self.variable_names]) + ', "execution_time", "sent_data", "received_data"'
-        sql = f'INSERT INTO execution_data ({columns}) VALUES ({placeholders})'
-
-        try:
-            cursor.execute(sql, values)
-            conn.commit()
-        except Exception as e:
-            print(f"Error al insertar datos en la base de datos: {e}")
-        finally:
-            conn.close()
-
-    def get_steps_from_batch(self, batch_id=None, tiempo=None, intervalo=1.0):
-        """Obtiene los pasos del batch específico y filtra por el rango de tiempo proporcionado.
-           Si se encuentra un execution_time nulo, se usa el valor anterior o 0 si tampoco hay uno anterior.
-        """
-        # Si no se proporciona un batch_id, usamos el último batch disponible
-        batch_id = batch_id or self.current_batch or self.last_batch
-        if batch_id is None:
-            print("No hay batch_id disponible para recuperar datos.")
-            return {"error": "No hay batch_id disponible para recuperar datos."}
-
-        conn = sqlite3.connect('execution_data.db')
-        cursor = conn.cursor()
-        print("batch_id:", batch_id)
-        print("tiempo solicitado:", tiempo)
-
-        try:
-            # Contar el número total de pasos en la base de datos para este batch
-            cursor.execute('SELECT COUNT(*) FROM execution_data WHERE batch_id = ?', (batch_id,))
-            total_steps = cursor.fetchone()[0]
-            print(f"Total de pasos registrados en el batch '{batch_id}': {total_steps}")
-
-            # Obtener el rango de tiempos (mínimo y máximo execution_time) en el batch
-            cursor.execute(
-                'SELECT MIN(execution_time), MAX(execution_time) FROM execution_data WHERE batch_id = ?',
-                (batch_id,)
-            )
-            time_range = cursor.fetchone()
-            print(f"Rango de tiempo del batch '{batch_id}': {time_range[0]} (mínimo), {time_range[1]} (máximo)")
-
-            # Recuperar todos los datos del batch ordenados por tiempo
-            cursor.execute('SELECT * FROM execution_data WHERE batch_id = ? ORDER BY execution_time ASC', (batch_id,))
-            rows = cursor.fetchall()
-
-            if not rows:
-                print("No se encontraron datos para este batch.")
-                return {}
-
-            print(f"Cantidad de filas recuperadas del batch: {len(rows)}")
-
-            filtered_rows = []
-            previous_time = None
-            last_valid_time = 0  # Inicializamos con un tiempo predeterminado
-            step_count = 0
-
-            current_time = time.time()
-
-            # Ajuste en el cálculo de time_limit
-            if tiempo is not None:
-                time_limit = current_time - tiempo
-                print(f"Filtrando datos desde el tiempo {time_limit} hasta {current_time} (últimos {tiempo} segundos)")
-            else:
-                time_limit = 0  # Si tiempo es None, no limitamos por tiempo
-                print("No se aplicará filtrado por tiempo; se incluirán todos los datos disponibles.")
-
-            for row_index, row in enumerate(rows):
-                # Aquí puedes ajustar según la estructura de tus filas y columnas
-                print(f"Procesando fila {row_index + 1}/{len(rows)}: {row}")
-                if len(row) < len(self.variable_names) + 4:
-                    print(f"Advertencia: Fila incompleta o inesperada -> {row}")
-                    continue
-
-                execution_time = row[-3]
-
-                # Si el tiempo de ejecución es nulo, usa el último tiempo válido
-                if execution_time is None:
-                    print(
-                        f"Advertencia: execution_time es None en la fila {row_index + 1}. Usando último tiempo válido ({last_valid_time}).")
-                    execution_time = last_valid_time
-                else:
-                    last_valid_time = execution_time
-
-                # Filtrar por límite de tiempo si es aplicable
-                if tiempo is not None and execution_time < time_limit:
-                    print(
-                        f"Fila {row_index + 1}: execution_time ({execution_time}) fuera del límite de tiempo ({time_limit}).")
-                    continue
-
-                # Filtrar por intervalo
-                if previous_time is None or (execution_time - previous_time) >= intervalo:
-                    filtered_row = [
-                        round(float(val), 2) if isinstance(val, (float, int)) else val
-                        for val in row[1:]
-                    ]
-                    filtered_rows.append(filtered_row)
-                    previous_time = execution_time
-                    step_count += 1
-
-            columns = self.variable_names + ['execution_time', 'sent_data', 'received_data']
-
-            if step_count > 0:
-                data = {col: [row[idx] for row in filtered_rows] for idx, col in enumerate(columns)}
-                print(f"Datos filtrados: {data}")
-                print(f"Total de pasos seleccionados tras filtrar: {step_count}")
-                return data
-            else:
-                print("No se encontraron pasos en el intervalo especificado o dentro del tiempo solicitado.")
-                return {
-                    "error": "No se han encontrado pasos en el intervalo especificado o dentro del tiempo solicitado"
-                }
-
-        except Exception as e:
-            print(f"Error al obtener los datos del batch: {e}")
-            return {}
-        finally:
-            cursor.close()
-            conn.close()
-
-    ###...Funciones relacionadads con la conexion serial con arduino
     def connect_serial(self):
         if self.ser is not None and self.ser.is_open:
-            try:
-                self.ser.close()  # Cerrar el puerto si ya está abierto
-                print("Puerto serial cerrado correctamente.")
-            except Exception as e:
-                print(f"Error al cerrar el puerto serial: {e}")
-
+            self.ser.close()
         try:
             self.ser = serial.Serial(self.port, self.baudrate, timeout=0.3)
             time.sleep(2)
             print("Conectado al puerto serial", self.port)
-            self.store_serial_data(sent_data="Conexión establecida en puerto: " + self.port)
             return True
         except serial.SerialException as e:
             print(f"Error al conectar al puerto serial: {e}")
@@ -393,9 +177,6 @@ class BasicEnv(gym.Env):
                         line = buffer[start + 1:end]
                         buffer = buffer[end + 1:]
                         self.process_serial_line(line)
-                        # Guardar los datos recibidos
-                        self.store_serial_data(received_data=line)
-
             except serial.SerialException as e:
                 print(f"Serial read error: {e}")
                 self.ser = None
@@ -403,188 +184,74 @@ class BasicEnv(gym.Env):
                 print(f"Unexpected error: {e}")
 
     def process_serial_line(self, line):
-        import time
-
-        # Procesar la línea serial recibida
+        # Dividir la línea por comas
         values = line.strip().split(',')
 
-        # Convertir los valores a float y manejar posibles errores
-        try:
-            obs_data = np.array([float(v) if v else 0.0 for v in values], dtype=np.float32)
-        except ValueError as e:
-            print(f"Error al convertir los valores de la línea serial a float: {e}")
+        if len(values) != 24:
+            print(f"Error: expected 24 values, got {len(values)}")
             return
 
-        # Actualizar la observación actual
-        self.current_observation = obs_data
-
-        # Obtener el tiempo de ejecución
-        execution_time = time.time()
-
-        # Crear un diccionario para depuración (opcional)
-        obs_dict = dict(zip(self.variable_names, obs_data))
-       # print(f"Datos a insertar: {obs_dict}")
-
-        # Almacenar los datos en la base de datos
-        self.store_serial_data(obs_data=obs_data, received_data=line, execution_time=execution_time)
-
-    ##...funciones generales que concuerdan con la metodología Gym
-    def custom_action(self, obs):
-
-        obs = np.nan_to_num(obs, nan=0.0)
-        # Definir setpoints y parámetros PID para X y A únicamente
-        setpoint_x = 0
-        setpoint_a = 0
-        kp_x, ki_x, kd_x = 1.0, 0.1, 0.05
-        kp_a, ki_a, kd_a = 1.5, 0.3, 0.2
-
-
-        action = [
-            0,  # modoManual
-            0,  # EMA no sirve estando el modo manual desactivado
-            0,  # EMX no sirve estando el modo manual desactivado
-            0,  # EMV no sirve estando el modo manual desactivado
-            setpoint_x,  # X_Requerido
-            setpoint_a,  # A_Requerido
-            0,  # Vol_requerido
-            kp_x, ki_x, kd_x,  # PID para corredera (X)
-            kp_a, ki_a, kd_a,  # PID para ángulo (A)
-            0,  # resetVolumen
-            0,  # resetMotorXFlag
-            0,  # resetMotorAFlag
-            obs[18],  # stepsPerMM
-            obs[19],  # stepsPerDegree
-            0,  # valor no utilizado
-            0  # valor no utilizado
-        ]
-
-        return np.array(action, dtype=np.float32)
-
-    def step(self, action=None):
-        # Procesar entrada del joypad solo si está habilitado
-        if self.joypad_enabled:
-            self.process_joystick_input()
-        if self.ser is None or not self.ser.is_open:
-            self.connect_serial()
-        # Obtener la observación actual
-        obs = self.get_observation()
-        # Si se proporciona una acción, actualizar 'self.current_action'
-        if action is not None:
-            self.current_action = action
-        # Si 'action' es 'None', mantenemos 'self.current_action' sin cambios
-
-        # Verificar que 'self.current_action' no sea 'None'
-        if self.current_action is None:
-            print("Advertencia: 'self.current_action' es 'None'. Usando acción por defecto.")
-            self.current_action = np.zeros(20)  # O establece valores predeterminados apropiados
-
-        # Ensamblar la cadena de comando para enviar al Arduino
-        command_values = [
-            int(self.current_action[0]),  # modoManual
-            int(self.current_action[1]),  # EMA
-            int(self.current_action[2]),  # EMX
-            int(self.current_action[3]),  # EMV
-            float(self.current_action[4]),  # X_Requerido
-            float(self.current_action[5]),  # A_Requerido
-            float(self.current_action[6]),  # Vol_requerido
-            float(self.current_action[7]),  # kpX
-            float(self.current_action[8]),  # kiX
-            float(self.current_action[9]),  # kdX
-            float(self.current_action[10]),  # kpA
-            float(self.current_action[11]),  # kiA
-            float(self.current_action[12]),  # kdA
-            int(self.current_action[13]),  # resetVolumen
-            int(self.current_action[14]),  # resetMotorXFlag
-            int(self.current_action[15]),  # resetMotorAFlag
-            float(self.current_action[16]),  # stepsPerMM
-            float(self.current_action[17]),  # stepsPerDegree
-            int(self.current_action[18]),  # usarSensorVelocidad
-            0  # Valor no utilizado
-        ]
-
-        # Convertir los valores a strings y unirlos con comas
-        command_str = ','.join(map(str, command_values)) + '\n'
         try:
-            if self.ser:
-                self.ser.write(command_str.encode())
-        except serial.SerialException as e:
-            print(f"Error al escribir en el puerto serial: {e}")
-            self.ser = None
-        reward = round(self.calculate_reward(obs), 1)
-        # Almacenar cada observación en la base de datos asociada al batch actual
-        self.store_serial_data(obs_data=obs, sent_data=str(command_values), received_data=str(obs))
-        time.sleep(0.3)
-        return obs, reward, False, {}
+            # Asignar los valores a las variables correspondientes
+            inputX = float(values[0])
+            inputA = float(values[1])
+            inputV = float(values[2])
+            flowVolume = float(values[3])
+            limite_X = int(values[4])
+            limite_A = int(values[5])
+            calibrando_X = int(values[6])
+            calibrando_A = int(values[7])
+            manualMotorX = int(values[8])
+            manualMotorA = int(values[9])
+            manualMotorV = int(values[10])
+            modoManual = int(values[11])
+            kpX = float(values[12])
+            kiX = float(values[13])
+            kdX = float(values[14])
+            kpA = float(values[15])
+            kiA = float(values[16])
+            kdA = float(values[17])
+            kpV = float(values[18])
+            kiV = float(values[19])
+            kdV = float(values[20])
+            stepsPerMM = float(values[21])
+            stepsPerDegree = float(values[22])
+            flowCalibFactor = float(values[23])
 
-    def calculate_reward(self, obs):
-        # Implementar la función de recompensa según tus necesidades
-        reward = 0
-        return reward
+            # Crear el array de observación
+            obs = np.array([
+                inputX,  # [0]
+                inputA,  # [1]
+                inputV,  # [2]
+                flowVolume,  # [3]
+                limite_X,  # [4]
+                limite_A,  # [5]
+                calibrando_X,  # [6]
+                calibrando_A,  # [7]
+                manualMotorX,  # [8]
+                manualMotorA,  # [9]
+                manualMotorV,  # [10]
+                modoManual,  # [11]
+                kpX,  # [12]
+                kiX,  # [13]
+                kdX,  # [14]
+                kpA,  # [15]
+                kiA,  # [16]
+                kdA,  # [17]
+                kpV,  # [18]
+                kiV,  # [19]
+                kdV,  # [20]
+                stepsPerMM,  # [21]
+                stepsPerDegree,  # [22]
+                flowCalibFactor  # [23]
+            ], dtype=np.float32)
 
-    def reset(self):
-        # Reconectar al puerto serial si es necesario
-        if self.ser is None:
-            self.connect_serial()
-        if self.ser:
-            # Enviar un comando de reinicio al dispositivo
-            self.ser.write(b'reset\n')
-        time.sleep(2)  # Pausa para asegurar que el dispositivo esté reiniciado
-
-        # Reiniciar las variables de acción a sus valores predeterminados
-        self.current_action = np.zeros(20)
-
-        # Cargar la configuración guardada para PID y calibraciones
-        self.load_configurations()
-
-        # Reiniciar cualquier otra configuración necesaria
-        self.manual_mode = 1
-        # Si es necesario, enviar comandos específicos para restablecer los motores
-        # (esto dependerá del comportamiento de tu hardware)
-        self.set_manual_mode(self.manual_mode)
-
-        # Reiniciar el tiempo de inicio para c
-        # Restablecer energías y setpoints
-        self.set_energy_corredera(0)  # Restablecer energía de corredera
-        self.set_energy_angulo(0)  # Restablecer energía de ángulo
-        self.set_energy_valvula(0)  # Restablecer energía de la válvula
-
-        #cálculos de tiempo de ejecución
-        self.start_time = time.time()
-
-        # Retornar la observación inicial
-        return self.get_observation()
-
-    def render(self, mode='human'):
-        pass
-
-    def get_observation(self):
-        """
-        Retrieves the most recent observation from the database.
-        """
-        conn = sqlite3.connect('execution_data.db')
-        cursor = conn.cursor()
-        try:
-            cursor.execute(
-                'SELECT * FROM execution_data WHERE batch_id = ? AND inputX IS NOT NULL ORDER BY execution_time DESC LIMIT 1',
-                (self.current_batch,))
-            row = cursor.fetchone()
-
-            if row is None:
-                print("No se encontraron datos en la base de datos.")
-                return np.zeros(len(self.variable_names), dtype=np.float32)
-
-            # Extract observation data (excluding batch_id and sent/received data)
-            observation = np.array(row[1:1 + len(self.variable_names)], dtype=np.float32)
-
-            return observation
-        except sqlite3.Error as e:
-            print(f"Error al obtener la observación de la base de datos: {e}")
-            return None
-        finally:
-            conn.close()
-
-
-## .. funciones relacionadas con el Uso del control joypad
+            # Colocar la observación en la cola
+            self.data_queue.put(obs)
+        except ValueError as e:
+            print(f"Value error: {e}")
+        except Exception as e:
+            print(f"Unexpected error: {e}")
 
     def check_joystick_connection(self):
         pygame.joystick.quit()
@@ -644,6 +311,7 @@ class BasicEnv(gym.Env):
                         print(f"Modo cambiado a {'Manual' if self.manual_mode else 'Automático'}")
             elif event.type == pygame.QUIT:
                 pygame.quit()
+
     def enable_joypad(self):
         """
         Habilita el procesamiento de la entrada del joypad.
@@ -658,14 +326,95 @@ class BasicEnv(gym.Env):
         self.joypad_enabled = False
         print("Entrada del joypad deshabilitada.")
 
-    def set_steps_per_mm(self, steps_per_mm):
-        self.current_action[16] = float(steps_per_mm)
-        self.save_configurations()  # Guardar las configuraciones
+    def step(self, action=None):
+        # Procesar entrada del joypad solo si está habilitado
+        if self.joypad_enabled:
+            self.process_joystick_input()
 
-    def set_steps_per_degree(self, steps_per_degree):
-        self.current_action[17] = float(steps_per_degree)
-        self.save_configurations()  # Guardar las configuraciones
+        if self.ser is None or not self.ser.is_open:
+            self.connect_serial()
 
+        # Si no se proporciona una acción, usar self.current_action
+        if action is None:
+            action = self.current_action
+        else:
+            self.current_action = action
+
+        # Ensamblar la cadena de comando para enviar al Arduino
+        command_values = [
+            int(self.current_action[0]),   # modoManual
+            int(self.current_action[1]),   # manualMotorA
+            int(self.current_action[2]),   # manualMotorX
+            int(self.current_action[3]),   # manualMotorV
+            float(self.current_action[4]), # X_Requerido
+            float(self.current_action[5]), # A_Requerido
+            float(self.current_action[6]), # Vel_Requerida
+            float(self.current_action[7]), # kpX
+            float(self.current_action[8]), # kiX
+            float(self.current_action[9]), # kdX
+            float(self.current_action[10]),# kpA
+            float(self.current_action[11]),# kiA
+            float(self.current_action[12]),# kdA
+            float(self.current_action[13]),# kpV
+            float(self.current_action[14]),# kiV
+            float(self.current_action[15]),# kdV
+            int(self.current_action[16]),  # resetMotorXFlag
+            int(self.current_action[17]),  # resetMotorAFlag
+            float(self.current_action[18]),# stepsPerMM
+            float(self.current_action[19]) # stepsPerDegree
+        ]
+
+        # Convertir los valores a strings y unirlos con comas
+        command_str = ','.join(map(str, command_values)) + '\n'
+
+        try:
+            if self.ser:
+                self.ser.write(command_str.encode())
+        except serial.SerialException as e:
+            print(f"Error al escribir en el puerto serial: {e}")
+            self.ser = None
+
+        start_time = time.time()
+        obs = self.get_observation()
+
+        while obs is None:
+            try:
+                obs = self.data_queue.get(timeout=1)
+            except queue.Empty:
+                continue
+
+        self.simulation_time = round(time.time() - self.start_time, 1)
+
+        reward = round(self.calculate_reward(obs), 1)
+        self.store_step(obs, reward)
+
+        return obs, reward, False, {}
+
+    def calculate_reward(self, obs):
+        # Implementar la función de recompensa según tus necesidades
+        reward = 0
+        return reward
+
+    def reset(self):
+        if self.ser is None:
+            self.connect_serial()
+        if self.ser:
+            self.ser.write(b'reset\n')
+        time.sleep(2)
+        self.current_action = np.zeros(20)
+        self.execution_data = []
+        self.manual_mode = 0
+        self.set_manual_mode(self.manual_mode)
+        return self.get_observation()
+
+    def render(self, mode='human'):
+        pass
+
+    def get_observation(self):
+        try:
+            return self.data_queue.get_nowait()
+        except queue.Empty:
+            return None
 
     # Métodos para establecer acciones
     def set_corredera(self, setpoint_corredera):
@@ -680,11 +429,11 @@ class BasicEnv(gym.Env):
                                  self.action_space.high[5])
         self.current_action[5] = round(setpoint_angle, 2)
 
-    def set_volumen_requerido(self, volumen_requerido):
-        volumen_requerido = np.clip(volumen_requerido,
-                                    self.action_space.low[6],
-                                    self.action_space.high[6])
-        self.current_action[6] = round(volumen_requerido, 1)
+    def set_valvula(self, setpoint_water):
+        setpoint_water = np.clip(setpoint_water,
+                                 self.action_space.low[6],
+                                 self.action_space.high[6])
+        self.current_action[6] = round(setpoint_water, 1)
 
     def set_energy_corredera(self, energia_corredera):
         energia_corredera = np.clip(energia_corredera,
@@ -704,83 +453,76 @@ class BasicEnv(gym.Env):
                                   self.action_space.high[3])
         self.current_action[3] = int(energia_valvula)
 
-    def set_pid_corredera(self, kp, ki, kd, save=True):
+    def set_pid_corredera(self, kp, ki, kd):
         self.current_action[7] = round(kp, 1)
         self.current_action[8] = round(ki, 1)
         self.current_action[9] = round(kd, 1)
-        if save:
-            self.save_configurations()  # Guardar solo si save=True
 
-    def set_pid_angulo(self, kp, ki, kd, save=True):
+    def set_pid_angulo(self, kp, ki, kd):
         self.current_action[10] = round(kp, 1)
         self.current_action[11] = round(ki, 1)
         self.current_action[12] = round(kd, 1)
-        if save:
-            self.save_configurations()
+
+    def set_pid_valvula(self, kp, ki, kd):
+        self.current_action[13] = round(kp, 1)
+        self.current_action[14] = round(ki, 1)
+        self.current_action[15] = round(kd, 1)
 
     def set_manual_mode(self, manual_mode):
         self.current_action[0] = int(manual_mode)
 
-    def set_use_speed_sensor(self, flag):
-        self.current_action[18] = 1 if flag else 0
-
-    def reset_volumen(self):
-        self.current_action[13] = 1  # Establecer la bandera para reiniciar el volumen
-
-    def reset_X(self, calibrate):
-        self.current_action[14] = int(calibrate)
-
-    def reset_A(self, calibrate):
-        self.current_action[15] = int(calibrate)
-
-    def calibrate_StepsPerMM(self, calibrate):
+    def calibrate_X(self, calibrate):
         self.current_action[16] = int(calibrate)
 
-    def calibrate_stepsPerDegree(self, calibrate):
+    def calibrate_A(self, calibrate):
         self.current_action[17] = int(calibrate)
 
-    def detener_motores(self):
-        stop_action = self.current_action.copy()
-        stop_action[0] = 1
-        stop_action[1] = 0
-        stop_action[2] = 0
-        stop_action[3] = 0
-        self.step(stop_action)
-        return "Motores detenidos."
+    def store_step(self, obs, reward):
+        step_data = np.append(obs, reward)
+        self.execution_data.append(step_data)
 
-    def update_requirements(self, **kwargs):
-        if 'X_Requerido' in kwargs:
-            self.set_corredera(kwargs['X_Requerido'])
-        if 'A_Requerido' in kwargs:
-            self.set_angulo(kwargs['A_Requerido'])
-        if 'Vol_requerido' in kwargs:
-            self.set_volumen_requerido(kwargs['Vol_requerido'])
-        return "Requerimientos actualizados."
+    def save_execution(self, execution_name):
+        with open(f'robot_steps_execution_{execution_name}.csv',
+                  'w', newline='') as csvfile:
+            csv_writer = csv.writer(csvfile)
+            csv_writer.writerow(self.variable_names + ['reward'])
+            for row in self.execution_data:
+                csv_writer.writerow(row)
 
-    def start_observing(self, batch_id=None):
-        new_batch_id = self.start_batch(batch_id)
-        return f"Observación iniciada con batch_id: {new_batch_id}"
+    def view_execution(self, execution_name, variable_names):
+        try:
+            with open(f'robot_steps_execution_{execution_name}.csv',
+                      'r') as csvfile:
+                csv_reader = csv.reader(csvfile)
+                headers = next(csv_reader)
+                self.execution_data = []
+                for row in csv_reader:
+                    self.execution_data.append([float(x) for x in row])
 
-    def stop_observing(self):
-        if self.current_batch is None:
-            return {"error": "No hay una observación activa."}
-        data = self.get_steps_from_batch(batch_id=self.current_batch, tiempo=None, intervalo=0.01)
-        # Opcional: self.current_batch = None
-        return data
+            # Convertir nombres de variables a índices
+            indices = [self.variable_names.index(name) for name in variable_names]
 
-    def get_latest_observations(self, tiempo=10.0, intervalo=1.0):
-        if self.current_batch is None and not hasattr(self, 'last_batch'):
-            return {"error": "No se han registrado batchs ni observaciones."}
-        batch_id = self.current_batch if self.current_batch is not None else getattr(self, 'last_batch', None)
-        if batch_id is None:
-            return {"error": "No hay batch disponible."}
-        data = self.get_steps_from_batch(batch_id=batch_id, tiempo=tiempo, intervalo=intervalo)
-        return data
+            # Graficar las variables especificadas
+            self.plot_data(indices, title=f"Ejecución {execution_name} - Variables Seleccionadas en el Tiempo")
+
+        except FileNotFoundError:
+            print(f"No se encontraron datos para la ejecución {execution_name}")
+        except ValueError as e:
+            print(f"Error: {e}")
+
+    def plot_data(self, variable_indices, title="Gráfico de Datos"):
+        plt.figure(figsize=(10, 5))
+        for index in variable_indices:
+            data = [step[index] for step in self.execution_data]
+            plt.plot(data, label=self.variable_names[index])
+        plt.xlabel('Paso')
+        plt.ylabel('Valor')
+        plt.title(title)
+        plt.legend()
+        plt.show()
 
     def close(self):
         self.stop_thread = True
-        if hasattr(self, 'conn'):
-            self.conn.close()
         if self.ser is not None:
             self.ser.close()
         if self.joystick is not None:
@@ -788,3 +530,28 @@ class BasicEnv(gym.Env):
         pygame.quit()
         print("Entorno cerrado")
 
+
+
+
+
+    # Métodos para gestionar plantas y regímenes
+    def agregar_planta(self, planta_details, era):
+        self.plantas_manager.agregar_planta(planta_details, era)
+
+    def modificar_planta(self, era, fila, updated_values):
+        self.plantas_manager.modificar_planta(era, fila, updated_values)
+
+    def eliminar_planta(self, era, fila):
+        self.plantas_manager.eliminar_planta(era, fila)
+
+    def agregar_regimen(self, regimen_name):
+        self.regimenes_manager.agregar_regimen(regimen_name)
+
+    def modificar_tarea(self, regimen, fila, updated_values):
+        self.regimenes_manager.modificar_tarea(regimen, fila, updated_values)
+
+    def eliminar_tarea(self, regimen, fila):
+        self.regimenes_manager.eliminar_tarea(regimen, fila)
+
+    def crear_ensayo(self):
+        self.ensayos_env.crear_ensayo()
