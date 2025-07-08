@@ -531,9 +531,6 @@ class BasicEnv(gym.Env):
         print("Entorno cerrado")
 
 
-
-
-
     # Métodos para gestionar plantas y regímenes
     def agregar_planta(self, planta_details, era):
         self.plantas_manager.agregar_planta(planta_details, era)
