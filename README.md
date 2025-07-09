@@ -47,3 +47,7 @@ virtual_env = BasicEnv(mode='virtual')
 ```
 
 Both modes share the same API so your control code works without changes.
+
+## Assistant Instructions
+
+The guidelines for interacting with the robot programmatically are now kept in `docs/assistant_instructions.txt`. This document explains the variables exposed by `BasicEnv` and demonstrates manual and automatic control flows. Consult it if you need to implement your own automation scripts.
