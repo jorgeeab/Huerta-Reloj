@@ -1,9 +1,6 @@
 import matplotlib.pyplot as plt
-from openpyxl import load_workbook
-from .plantas import PlantasManager
-from .regimenes import RegimenesManager
-from .ensayos import EnsayosEnv
-#from .utils import crear_archivos_plantas_y_regimenes
+from nuevo_plantas import PlantasManager
+from .tasks_manager import RobotTasksManager
 import pygame
 import numpy as np
 import gym
@@ -12,23 +9,18 @@ import threading
 import time
 import queue
 import csv
-import matplotlib.pyplot as plt
-from openpyxl import load_workbook
-import pygame
 
 class BasicEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, port='COM6', baudrate=115200,
-                 archivo_plantas='archivo_plantas.xlsx',
-                 archivo_regimenes='archivo_regimenes.xlsx',
-                 archivo_ensayos='archivo_ensayos.xlsx'):
+                 archivo_json='plantas.json',
+                 archivo_tareas='tareas_robot.json'):
         super(BasicEnv, self).__init__()
 
-        # Inicializar gestores de plantas y regímenes
-        self.plantas_manager = PlantasManager(archivo_plantas)
-        self.regimenes_manager = RegimenesManager(archivo_regimenes)
-        self.ensayos_env = EnsayosEnv(archivo_plantas, archivo_regimenes, archivo_ensayos)
+        # Gestores de datos basados en JSON
+        self.plantas_manager = PlantasManager(archivo_json)
+        self.tareas_manager = RobotTasksManager(archivo_tareas)
 
         # Definir espacios de acción y observación
         self.action_space = gym.spaces.Box(
@@ -541,14 +533,22 @@ class BasicEnv(gym.Env):
     def eliminar_planta(self, era, fila):
         self.plantas_manager.eliminar_planta(era, fila)
 
-    def agregar_regimen(self, regimen_name):
-        self.regimenes_manager.agregar_regimen(regimen_name)
+    def agregar_regimen(self, *args, **kwargs):
+        return self.plantas_manager.crear_regimen(*args, **kwargs)
 
-    def modificar_tarea(self, regimen, fila, updated_values):
-        self.regimenes_manager.modificar_tarea(regimen, fila, updated_values)
+    def modificar_tarea(self, *args, **kwargs):
+        return self.plantas_manager.modificar_regimen(*args, **kwargs)
 
-    def eliminar_tarea(self, regimen, fila):
-        self.regimenes_manager.eliminar_tarea(regimen, fila)
+    def eliminar_tarea(self, *args, **kwargs):
+        return self.plantas_manager.eliminar_regimen(*args, **kwargs)
 
-    def crear_ensayo(self):
-        self.ensayos_env.crear_ensayo()
+    # Gestión de tareas específicas del robot
+    def agregar_tarea_robot(self, tarea):
+        self.tareas_manager.agregar_tarea(tarea)
+
+    def obtener_tareas_robot(self):
+        return self.tareas_manager.obtener_tareas()
+
+    def eliminar_tarea_robot(self, index):
+        self.tareas_manager.eliminar_tarea(index)
+
