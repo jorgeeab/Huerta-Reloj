@@ -1,9 +1,8 @@
 from .basic_env import BasicEnv
-from .plantas import PlantasManager
-from .regimenes import RegimenesManager
-from .ensayos import EnsayosEnv
+from nuevo_plantas import PlantasManager
+from .tasks_manager import RobotTasksManager
 from .interfaz import Interfaz
-#from .utils import crear_archivos_plantas_y_regimenes
+
 
 def register_env():
     from gym.envs.registration import register
@@ -11,5 +10,4 @@ def register_env():
         id='BasicEnv-v0',
         entry_point='basic_gym_env:BasicEnv',
     )
-
 register_env()
