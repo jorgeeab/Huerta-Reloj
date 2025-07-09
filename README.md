@@ -31,3 +31,19 @@ env = BasicEnv(archivo_json='plantas.json', archivo_tareas='tareas_robot.json')
 
 This setup lets multiple robots work in the same environment with the same
 plant configuration while maintaining independent task queues.
+
+## Execution Modes
+
+`BasicEnv` can operate either with a physical robot connected over a serial port or with a virtual robot simulated in PyBullet. Select the mode when creating the environment:
+
+```python
+from basic_gym_env.basic_env import BasicEnv
+
+# Physical robot on serial port COM6
+real_env = BasicEnv(port='COM6', mode='serial')
+
+# Virtual PyBullet robot
+virtual_env = BasicEnv(mode='virtual')
+```
+
+Both modes share the same API so your control code works without changes.

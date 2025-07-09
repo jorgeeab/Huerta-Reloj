@@ -1,0 +1,6 @@
+gym
+numpy
+pyserial
+pybullet
+pygame
+simple-pid

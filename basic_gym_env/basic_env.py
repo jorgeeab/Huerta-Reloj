@@ -9,14 +9,19 @@ import threading
 import time
 import queue
 import csv
+import os
 
 class BasicEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, port='COM6', baudrate=115200,
                  archivo_json='plantas.json',
-                 archivo_tareas='tareas_robot.json'):
+                 archivo_tareas='tareas_robot.json',
+                 mode='serial', render=True):
         super(BasicEnv, self).__init__()
+
+        self.mode = mode
+        self.render = render
 
         # Gestores de datos basados en JSON
         self.plantas_manager = PlantasManager(archivo_json)
@@ -85,14 +90,36 @@ class BasicEnv(gym.Env):
         self.stop_thread = False
         self.start_time = time.time()
 
-        # Conectar al puerto serial y comenzar el hilo de lectura
         self.port = port
         self.baudrate = baudrate
         self.ser = None
-        self.connect_serial()
-        self.read_thread = threading.Thread(target=self.read_serial)
-        self.read_thread.daemon = True
-        self.read_thread.start()
+        self.read_thread = None
+
+        if self.mode == 'serial':
+            self.connect_serial()
+            self.read_thread = threading.Thread(target=self.read_serial)
+            self.read_thread.daemon = True
+            self.read_thread.start()
+        elif self.mode == 'virtual':
+            import pybullet as p
+            import pybullet_data
+            self.p = p
+            connection_mode = p.GUI if self.render else p.DIRECT
+            p.connect(connection_mode)
+            p.setAdditionalSearchPath(pybullet_data.getDataPath())
+            p.setGravity(0, 0, -9.8)
+            p.loadURDF("plane.urdf")
+            robot_path = os.path.join('control_robot',
+                                      'Reloj_1_description', 'urdf',
+                                      'Reloj_1.xacro')
+            self.robotId = p.loadURDF(robot_path, [0, 0, 0.01],
+                                      useFixedBase=True)
+            self.revolucion_joint_index = 0
+            self.corredera_joint_indices = [1, 2, 4, 5]
+            self.valve_position = 0.0
+            self.last_obs = np.zeros(24, dtype=np.float32)
+        else:
+            raise ValueError("mode must be 'serial' or 'virtual'")
 
         self.simulation_time = 0  # Tiempo de simulación
         self.execution_data = []  # Datos de la ejecución actual
@@ -139,6 +166,8 @@ class BasicEnv(gym.Env):
         self.set_manual_mode(self.manual_mode)
 
     def connect_serial(self):
+        if self.mode != 'serial':
+            return False
         if self.ser is not None and self.ser.is_open:
             self.ser.close()
         try:
@@ -152,6 +181,8 @@ class BasicEnv(gym.Env):
             return False
 
     def read_serial(self):
+        if self.mode != 'serial':
+            return
         buffer = ''
         while not self.stop_thread:
             if self.ser is None or not self.ser.is_open:
@@ -322,64 +353,99 @@ class BasicEnv(gym.Env):
         # Procesar entrada del joypad solo si está habilitado
         if self.joypad_enabled:
             self.process_joystick_input()
-
-        if self.ser is None or not self.ser.is_open:
-            self.connect_serial()
-
         # Si no se proporciona una acción, usar self.current_action
         if action is None:
             action = self.current_action
         else:
             self.current_action = action
 
-        # Ensamblar la cadena de comando para enviar al Arduino
-        command_values = [
-            int(self.current_action[0]),   # modoManual
-            int(self.current_action[1]),   # manualMotorA
-            int(self.current_action[2]),   # manualMotorX
-            int(self.current_action[3]),   # manualMotorV
-            float(self.current_action[4]), # X_Requerido
-            float(self.current_action[5]), # A_Requerido
-            float(self.current_action[6]), # Vel_Requerida
-            float(self.current_action[7]), # kpX
-            float(self.current_action[8]), # kiX
-            float(self.current_action[9]), # kdX
-            float(self.current_action[10]),# kpA
-            float(self.current_action[11]),# kiA
-            float(self.current_action[12]),# kdA
-            float(self.current_action[13]),# kpV
-            float(self.current_action[14]),# kiV
-            float(self.current_action[15]),# kdV
-            int(self.current_action[16]),  # resetMotorXFlag
-            int(self.current_action[17]),  # resetMotorAFlag
-            float(self.current_action[18]),# stepsPerMM
-            float(self.current_action[19]) # stepsPerDegree
-        ]
+        if self.mode == 'serial':
+            if self.ser is None or not self.ser.is_open:
+                self.connect_serial()
 
-        # Convertir los valores a strings y unirlos con comas
-        command_str = ','.join(map(str, command_values)) + '\n'
+            command_values = [
+                int(self.current_action[0]),   # modoManual
+                int(self.current_action[1]),   # manualMotorA
+                int(self.current_action[2]),   # manualMotorX
+                int(self.current_action[3]),   # manualMotorV
+                float(self.current_action[4]), # X_Requerido
+                float(self.current_action[5]), # A_Requerido
+                float(self.current_action[6]), # Vel_Requerida
+                float(self.current_action[7]), # kpX
+                float(self.current_action[8]), # kiX
+                float(self.current_action[9]), # kdX
+                float(self.current_action[10]),# kpA
+                float(self.current_action[11]),# kiA
+                float(self.current_action[12]),# kdA
+                float(self.current_action[13]),# kpV
+                float(self.current_action[14]),# kiV
+                float(self.current_action[15]),# kdV
+                int(self.current_action[16]),  # resetMotorXFlag
+                int(self.current_action[17]),  # resetMotorAFlag
+                float(self.current_action[18]),# stepsPerMM
+                float(self.current_action[19]) # stepsPerDegree
+            ]
 
-        try:
-            if self.ser:
-                self.ser.write(command_str.encode())
-        except serial.SerialException as e:
-            print(f"Error al escribir en el puerto serial: {e}")
-            self.ser = None
+            command_str = ','.join(map(str, command_values)) + '\n'
 
-        start_time = time.time()
-        obs = self.get_observation()
-
-        while obs is None:
             try:
-                obs = self.data_queue.get(timeout=1)
-            except queue.Empty:
-                continue
+                if self.ser:
+                    self.ser.write(command_str.encode())
+            except serial.SerialException as e:
+                print(f"Error al escribir en el puerto serial: {e}")
+                self.ser = None
+
+            obs = self.get_observation()
+            while obs is None:
+                try:
+                    obs = self.data_queue.get(timeout=1)
+                except queue.Empty:
+                    continue
+        else:
+            angle_rad = np.deg2rad(self.current_action[5])
+            slide_pos = -(self.current_action[4] / 1000.0) * 0.2
+            for idx in self.corredera_joint_indices:
+                self.p.setJointMotorControl2(self.robotId, idx, self.p.POSITION_CONTROL,
+                                             targetPosition=slide_pos)
+            self.p.setJointMotorControl2(self.robotId, self.revolucion_joint_index,
+                                         self.p.POSITION_CONTROL, targetPosition=angle_rad)
+            self.valve_position = self.current_action[6]
+            self.p.stepSimulation()
+            time.sleep(1/240.0)
+            angle_state = self.p.getJointState(self.robotId, self.revolucion_joint_index)[0]
+            slide_state = self.p.getJointState(self.robotId, self.corredera_joint_indices[0])[0]
+            inputA = np.degrees(angle_state)
+            inputX = -slide_state * 1000.0 / 0.2
+            inputV = self.valve_position
+            flowVolume = 0.0
+            obs = np.array([
+                inputX,
+                inputA,
+                inputV,
+                flowVolume,
+                0, 0, 0, 0,
+                int(self.current_action[2]),
+                int(self.current_action[1]),
+                int(self.current_action[3]),
+                int(self.current_action[0]),
+                self.current_action[7],
+                self.current_action[8],
+                self.current_action[9],
+                self.current_action[10],
+                self.current_action[11],
+                self.current_action[12],
+                self.current_action[13],
+                self.current_action[14],
+                self.current_action[15],
+                self.current_action[18],
+                self.current_action[19],
+                1.0
+            ], dtype=np.float32)
+            self.last_obs = obs
 
         self.simulation_time = round(time.time() - self.start_time, 1)
-
         reward = round(self.calculate_reward(obs), 1)
         self.store_step(obs, reward)
-
         return obs, reward, False, {}
 
     def calculate_reward(self, obs):
@@ -388,11 +454,21 @@ class BasicEnv(gym.Env):
         return reward
 
     def reset(self):
-        if self.ser is None:
-            self.connect_serial()
-        if self.ser:
-            self.ser.write(b'reset\n')
-        time.sleep(2)
+        if self.mode == 'serial':
+            if self.ser is None:
+                self.connect_serial()
+            if self.ser:
+                self.ser.write(b'reset\n')
+            time.sleep(2)
+        else:
+            self.p.resetSimulation()
+            self.p.setGravity(0, 0, -9.8)
+            self.p.loadURDF("plane.urdf")
+            robot_path = os.path.join('control_robot',
+                                      'Reloj_1_description', 'urdf',
+                                      'Reloj_1.xacro')
+            self.robotId = self.p.loadURDF(robot_path, [0, 0, 0.01],
+                                           useFixedBase=True)
         self.current_action = np.zeros(20)
         self.execution_data = []
         self.manual_mode = 0
@@ -403,10 +479,13 @@ class BasicEnv(gym.Env):
         pass
 
     def get_observation(self):
-        try:
-            return self.data_queue.get_nowait()
-        except queue.Empty:
-            return None
+        if self.mode == 'serial':
+            try:
+                return self.data_queue.get_nowait()
+            except queue.Empty:
+                return None
+        else:
+            return self.last_obs
 
     # Métodos para establecer acciones
     def set_corredera(self, setpoint_corredera):
@@ -515,8 +594,11 @@ class BasicEnv(gym.Env):
 
     def close(self):
         self.stop_thread = True
-        if self.ser is not None:
-            self.ser.close()
+        if self.mode == 'serial':
+            if self.ser is not None:
+                self.ser.close()
+        else:
+            self.p.disconnect()
         if self.joystick is not None:
             self.joystick.quit()
         pygame.quit()
