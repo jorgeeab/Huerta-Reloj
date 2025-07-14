@@ -409,11 +409,15 @@ class BasicEnv(gym.Env):
                 self.ser = None
 
             obs = self.get_observation()
-            while obs is None:
+            waited = 0
+            while obs is None and waited < 3:
                 try:
                     obs = self.data_queue.get(timeout=1)
                 except queue.Empty:
-                    continue
+                    waited += 1
+            if obs is None:
+                # En ausencia de datos del robot, devuelve una observación por defecto
+                obs = np.zeros(self.observation_space.shape, dtype=np.float32)
         else:
             angle_rad = np.deg2rad(self.current_action[5])
             slide_pos = -(self.current_action[4] / 1000.0) * 0.2
