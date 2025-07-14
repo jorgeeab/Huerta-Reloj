@@ -180,6 +180,19 @@ class BasicEnv(gym.Env):
             self.ser = None
             return False
 
+    def disconnect_serial(self):
+        """Cerrar la conexión serial actual si está abierta."""
+        if self.ser is not None and self.ser.is_open:
+            self.ser.close()
+            print("Desconectado del puerto serial")
+
+    def change_port(self, new_port):
+        """Cambiar de puerto y reconectar."""
+        self.port = new_port
+        if self.mode == 'serial':
+            self.disconnect_serial()
+            self.connect_serial()
+
     def read_serial(self):
         if self.mode != 'serial':
             return

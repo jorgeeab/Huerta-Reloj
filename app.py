@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 import threading
 import time
 from basic_gym_env.basic_env import BasicEnv  # Asegúrate de que basic_env.py está en el mismo directorio
@@ -78,8 +78,12 @@ def robot_control():
             obs_dict = dict(zip(env.variable_names, obs_list))
         else:
             obs_dict = {}
+        serial_connected = env.ser is not None and env.ser.is_open
 
-    return render_template('robot_control.html', obs=obs_dict)
+    return render_template('robot_control.html',
+                           obs=obs_dict,
+                           current_port=env.port,
+                           serial_connected=serial_connected)
 @app.route('/get_observation')
 def get_observation():
     with env_lock:
@@ -101,5 +105,22 @@ def simulate_key():
         return jsonify({'status': 'Key processed'}), 200
     else:
         return jsonify({'error': 'No key provided'}), 400
+
+@app.route('/update_port', methods=['POST'])
+def update_port():
+    new_port = request.form.get('serial_port')
+    if new_port:
+        with env_lock:
+            env.change_port(new_port)
+    return redirect(url_for('robot_control'))
+
+@app.route('/toggle_connection', methods=['POST'])
+def toggle_connection():
+    with env_lock:
+        if env.ser is None or not env.ser.is_open:
+            env.connect_serial()
+        else:
+            env.disconnect_serial()
+    return redirect(url_for('robot_control'))
 if __name__ == '__main__':
     app.run(debug=True)

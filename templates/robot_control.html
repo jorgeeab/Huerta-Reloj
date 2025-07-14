@@ -5,6 +5,20 @@
 {% block content %}
 <h1>Control del Robot</h1>
 
+<form method="post" action="{{ url_for('update_port') }}" class="form-inline mb-3">
+    <div class="form-group mr-2">
+        <label for="serial_port" class="mr-2">Puerto COM</label>
+        <input type="text" class="form-control" id="serial_port" name="serial_port" value="{{ current_port }}">
+    </div>
+    <button type="submit" class="btn btn-warning">Cambiar Puerto</button>
+</form>
+
+<form method="post" action="{{ url_for('toggle_connection') }}" class="mb-4">
+    <button type="submit" class="btn btn-secondary">
+        {% if serial_connected %}Desconectar{% else %}Conectar{% endif %}
+    </button>
+</form>
+
 <form method="post">
     <div class="form-group form-check">
         <input type="checkbox" class="form-check-input" id="manual_mode" name="manual_mode" {% if obs.get('modoManual') == 1 %}checked{% endif %}>
