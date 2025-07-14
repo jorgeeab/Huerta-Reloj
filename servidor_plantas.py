@@ -7,8 +7,31 @@ from nuevo_plantas import PlantasManager
 import time
 import numpy as np
 from protocolos import Protocolo
+import os
+import json
+from pathlib import Path
 
 app = Flask(__name__)
+
+# ----- Simple JSON storage for demo endpoints -----
+DATA_DIR = Path('data')
+DATA_DIR.mkdir(exist_ok=True)
+REGS_FILE = DATA_DIR / 'regs.json'
+PLANTS_FILE = DATA_DIR / 'plants.json'
+TASKS_FILE = DATA_DIR / 'tasks.json'
+
+def _load_json(path, default):
+    try:
+        with open(path, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return default
+    except json.JSONDecodeError:
+        return default
+
+def _save_json(path, data):
+    with open(path, 'w') as f:
+        json.dump(data, f, indent=2)
 
 class ServidorFlask:
     def __init__(self):
@@ -483,6 +506,108 @@ def manejar_plantas():
     if not data:
         return jsonify({"error": "No se enviaron datos."}), 400
     return servidor.ejecutar_accion_plantas(data)
+
+
+# ----- Simplified API endpoints used by the front-end -----
+
+def _get_items(path):
+    return _load_json(path, [])
+
+def _save_items(path, items):
+    _save_json(path, items)
+
+@app.route('/api/regs', methods=['GET', 'POST'])
+def api_regs():
+    regs = _get_items(REGS_FILE)
+    if request.method == 'POST':
+        reg = {
+            'id': int(request.form.get('id', 0)),
+            'n': request.form.get('n', ''),
+            'd': request.form.get('d', '')
+        }
+        regs = [r for r in regs if r.get('id') != reg['id']]
+        regs.append(reg)
+        _save_items(REGS_FILE, regs)
+        return jsonify({'status': 'saved'})
+    del_id = request.args.get('del')
+    if del_id is not None:
+        regs = [r for r in regs if str(r.get('id')) != del_id]
+        _save_items(REGS_FILE, regs)
+        return jsonify({'status': 'deleted'})
+    return jsonify(regs)
+
+
+@app.route('/api/plants', methods=['GET', 'POST'])
+def api_plants():
+    plants = _get_items(PLANTS_FILE)
+    if request.method == 'POST':
+        plant = {
+            'id': int(request.form.get('id', 0)),
+            'reg': request.form.get('reg'),
+            'n': request.form.get('n'),
+            'd': request.form.get('d'),
+            's1': float(request.form.get('s1', 0)),
+            's2': float(request.form.get('s2', 0)),
+            'sp': float(request.form.get('sp', 0)),
+            'day': int(request.form.get('day', 1)),
+            'mon': int(request.form.get('mon', 1)),
+            'yr': int(request.form.get('yr', 2025))
+        }
+        plants = [p for p in plants if p.get('id') != plant['id']]
+        plants.append(plant)
+        _save_items(PLANTS_FILE, plants)
+        return jsonify({'status': 'saved'})
+    del_id = request.args.get('del')
+    if del_id is not None:
+        plants = [p for p in plants if str(p.get('id')) != del_id]
+        _save_items(PLANTS_FILE, plants)
+        return jsonify({'status': 'deleted'})
+    return jsonify(plants)
+
+
+@app.route('/api/tasks', methods=['GET', 'POST'])
+def api_tasks():
+    tasks = _get_items(TASKS_FILE)
+    if request.method == 'POST':
+        task = {
+            'id': int(request.form.get('id', 0)),
+            'reg': request.form.get('reg'),
+            'n': request.form.get('n'),
+            'off': request.form.get('off'),
+            'h': request.form.get('h'),
+            'm': request.form.get('m'),
+            'vol': request.form.get('vol'),
+            'exe': request.form.get('exe')
+        }
+        tasks = [t for t in tasks if t.get('id') != task['id']]
+        tasks.append(task)
+        _save_items(TASKS_FILE, tasks)
+        return jsonify({'status': 'saved'})
+    del_id = request.args.get('del')
+    if del_id is not None:
+        tasks = [t for t in tasks if str(t.get('id')) != del_id]
+        _save_items(TASKS_FILE, tasks)
+        return jsonify({'status': 'deleted'})
+    return jsonify(tasks)
+
+
+@app.route('/api/robots', methods=['GET', 'POST'])
+def api_robots():
+    if request.method == 'POST':
+        # In this simplified mode we just acknowledge the selection
+        return jsonify({'status': 'ok'})
+    return jsonify([{'name': 'LocalRobot', 'ip': 'serial'}])
+
+
+@app.route('/api/robot_info')
+def api_robot_info():
+    info = {
+        'type': 'basic_env',
+        'sensors': servidor.env.variable_names,
+        'motors': ['servo1', 'servo2', 'valve'],
+        'pidEditable': True
+    }
+    return jsonify(info)
 
 
 
