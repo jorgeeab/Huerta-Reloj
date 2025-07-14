@@ -384,8 +384,12 @@ def robot_control():
             obs_dict = dict(zip(servidor.env.variable_names, obs_list))
         else:
             obs_dict = {}
+        serial_connected = servidor.env.ser is not None and servidor.env.ser.is_open
 
-    return render_template('simple_panel.html', obs=obs_dict)
+    return render_template('panel.html',
+                           obs=obs_dict,
+                           current_port=servidor.env.port,
+                           serial_connected=serial_connected)
 
 @app.route('/get_observation')
 def get_observation():
@@ -407,6 +411,23 @@ def simulate_key():
         return jsonify({'status': 'Key processed'}), 200
     else:
         return jsonify({'error': 'No key provided'}), 400
+
+@app.route('/update_port', methods=['POST'])
+def update_port():
+    new_port = request.form.get('serial_port')
+    if new_port:
+        with env_lock:
+            servidor.env.change_port(new_port)
+    return redirect(url_for('robot_control'))
+
+@app.route('/toggle_connection', methods=['POST'])
+def toggle_connection():
+    with env_lock:
+        if servidor.env.ser is None or not servidor.env.ser.is_open:
+            servidor.env.connect_serial()
+        else:
+            servidor.env.disconnect_serial()
+    return redirect(url_for('robot_control'))
 
 # ---- Endpoints ----
 

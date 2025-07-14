@@ -142,7 +142,12 @@ body{background:#f8f9fa;}
       <label for="robot-select" class="mr-2">Robot:</label>
       <select id="robot-select" class="form-control form-control-sm"></select>
     </div>
-    <p id="mcu-ip" class="mb-0 text-muted small">IP: --</p>
+    <form method="post" action="{{ url_for('update_port') }}" class="form-inline ml-2">
+      <label for="serial_port" class="mr-2">Puerto COM:</label>
+      <input type="text" id="serial_port" name="serial_port" class="form-control form-control-sm mr-2" value="{{ current_port }}">
+      <button type="submit" class="btn btn-warning btn-sm">Cambiar</button>
+    </form>
+    <p id="mcu-ip" class="mb-0 text-muted small ml-2">IP: --</p>
     <p id="robot-type" class="mb-0 text-muted small ml-2">Tipo: --</p>
     <p id="robot-sensors" class="mb-0 text-muted small ml-2">Sensores: --</p>
     <p id="robot-motors" class="mb-0 text-muted small ml-2">Actuadores: --</p>
