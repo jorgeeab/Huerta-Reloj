@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for
+from serial.tools import list_ports
 import threading
 import time
 from basic_gym_env.basic_env import BasicEnv  # Asegúrate de que basic_env.py está en el mismo directorio
@@ -7,6 +8,11 @@ app = Flask(__name__)
 
 # Instancia global del entorno
 env = BasicEnv("COM8")
+
+
+def get_available_ports():
+    """Return a list of available serial port device names."""
+    return [port.device for port in list_ports.comports()]
 
 # Bloqueo para operaciones seguras en hilos múltiples
 env_lock = threading.Lock()
@@ -80,10 +86,13 @@ def robot_control():
             obs_dict = {}
         serial_connected = env.ser is not None and env.ser.is_open
 
+    available_ports = get_available_ports()
+
     return render_template('robot_control.html',
                            obs=obs_dict,
                            current_port=env.port,
-                           serial_connected=serial_connected)
+                           serial_connected=serial_connected,
+                           available_ports=available_ports)
 @app.route('/get_observation')
 def get_observation():
     with env_lock:
@@ -94,6 +103,13 @@ def get_observation():
             return jsonify(obs_dict)
         else:
             return jsonify({'error': 'No hay observación disponible'}), 500
+
+
+@app.route('/available_ports')
+def available_ports():
+    """Return the list of serial ports as JSON."""
+    ports = get_available_ports()
+    return jsonify({'ports': ports})
 @app.route('/simulate_key', methods=['POST'])
 def simulate_key():
     key = request.json.get('key')
