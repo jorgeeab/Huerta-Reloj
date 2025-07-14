@@ -362,7 +362,7 @@ def robot_control():
         else:
             obs_dict = {}
 
-    return render_template('robot_control.html', obs=obs_dict)
+    return render_template('panel.html', obs=obs_dict)
 
 @app.route('/get_observation')
 def get_observation():

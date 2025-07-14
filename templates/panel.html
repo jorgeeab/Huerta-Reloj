@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>NodeMCU Control</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Bootstrap + noUiSlider -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.6.1/nouislider.min.css">
+
+  <style>
+/* ───────────── Layout general ───────────── */
+body{background:#f8f9fa;}
+.container-page{
+  max-width:1200px;
+  background:#fff;
+  padding:24px 16px;
+  border-radius:8px;
+  box-shadow:0 0 12px rgba(0,0,0,.12);
+}
+@media(max-width:768px){
+  .container-page{padding:24px 8px;}
+}
+
+/* ───────────── Logs ───────────── */
+.logs{
+  background:#222;color:#fff;padding:8px;
+  height:140px;overflow:auto;font-family:monospace;font-size:13px;
+}
+
+/* ───────────── Gráficas ocultas en móviles ───────────── */
+@media(max-width:576px){
+  .chart-wrap{display:none !important;}
+}
+
+/* ───────────── Sliders ───────────── */
+#servo-slider,#s1-slider,#s2-slider,#flow-slider{margin:12px 0;}
+.noUi-horizontal{height:8px;}
+.noUi-handle{width:18px;height:18px;top:-6px;border-radius:50%;background:#007bff;border:0;}
+.chart-wrap{height:200px;}
+.badge-mini{font-size:90%;}
+.selected{background:#eef;}
+
+/* ajustes lista */
+.list-img{width:32px;height:32px;}
+.list-group-item .name{flex:1 1 auto;min-width:0;}
+@media(max-width:576px){
+  .list-group-item{padding:.25rem .5rem;}
+  .list-img{width:24px;height:24px;}
+}
+
+/* ───────────── Calendario base ───────────── */
+:root{--cell-width:90px;--cell-height:24px;}
+
+#calendar-container,#pl-calendar-container,#dash-calendar-container{
+  overflow-x:auto;overflow-y:auto;width:100%;
+  -webkit-overflow-scrolling:touch;
+}
+
+#calendar,#pl-calendar,#dash-calendar{
+  display:grid;grid-template-columns:60px repeat(7,var(--cell-width));
+  min-width:calc(60px + 7 * var(--cell-width));
+}
+
+.time-cell{
+  position:sticky;left:0;background:#f0f0f0;border:1px solid #eee;
+  text-align:right;padding:2px;font-size:.8em;z-index:2;
+}
+.day-header{
+  position:sticky;top:0;background:#fff;border:1px solid #eee;
+  text-align:center;padding:4px;font-weight:bold;z-index:1;
+}
+.day-cell{border:1px solid #eee;position:relative;height:var(--cell-height);}
+.event{
+  position:absolute;background:rgba(0,123,255,.2);
+  border:1px solid #007bff;border-radius:3px;padding:2px;
+  font-size:.75em;color:#fff;cursor:pointer;overflow:hidden;
+}
+.event.selected{outline:2px solid #007bff;}
+.time-now-line{position:absolute;top:0;bottom:0;width:2px;background:red;z-index:10;}
+.day-cell.highlight-now{background:rgba(255,0,0,.1);}
+.highlight-now{outline:2px solid red;}
+.day-cell.selected{background:rgba(40,167,69,.15);box-shadow:inset 0 0 0 2px #28a745;}
+.day-header.start-date,.day-cell.start-date{background:rgba(255,193,7,.2);}
+
+/* ───────────── Watermark tarjeta planta ───────────── */
+.card[data-bg]{position:relative;overflow:hidden;}
+.card[data-bg]::after{
+  content:'';position:absolute;top:50%;left:50%;width:160px;height:160px;
+  background-image:var(--bg-url);background-size:cover;background-position:center;
+  opacity:.06;transform:translate(-50%,-50%) rotate(-12deg);pointer-events:none;
+}
+
+/* celdas más estrechas en pantallas muy pequeñas */
+@media(max-width:576px){:root{--cell-width:70px;}}
+
+/* ───────────── Popup tareas ───────────── */
+.task-popup{
+  position:absolute;
+  z-index:1000;
+  min-width:160px;
+  background:#fff;
+  border:1px solid #ccc;
+  border-radius:4px;
+  padding:8px;
+  box-shadow:0 2px 6px rgba(0,0,0,.2);
+}
+.task-popup h6{font-size:1rem;margin-bottom:4px;}
+.task-popup button{white-space:nowrap;}
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-expand navbar-dark bg-primary">
+  <a class="navbar-brand" href="#">Torreta Control</a>
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#topNav">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+  <div id="topNav" class="collapse navbar-collapse">
+    <ul class="navbar-nav ml-auto">
+      <li class="nav-item"><a class="nav-link active" href="#dash">Dashboard</a></li>
+      <li class="nav-item"><a class="nav-link" href="#plants">Plantas</a></li>
+      <li class="nav-item"><a class="nav-link" href="#reg">Regímenes &amp; Tareas</a></li>
+      <li class="nav-item"><a class="nav-link" href="#camera">Cámara</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="container-page mt-3">
+  <div class="tab-content">
+
+<!-- ========================================================= -->
+<!-- ===================== DASHBOARD ========================= -->
+<!-- ========================================================= -->
+<div id="dash" class="tab-pane fade show active">
+
+  <h4 class="mb-1">Dashboard</h4>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="form-inline">
+      <label for="robot-select" class="mr-2">Robot:</label>
+      <select id="robot-select" class="form-control form-control-sm"></select>
+    </div>
+    <p id="mcu-ip" class="mb-0 text-muted small">IP: --</p>
+    <p id="robot-type" class="mb-0 text-muted small ml-2">Tipo: --</p>
+    <p id="robot-sensors" class="mb-0 text-muted small ml-2">Sensores: --</p>
+    <p id="robot-motors" class="mb-0 text-muted small ml-2">Actuadores: --</p>
+  </div>
+
+  <!-- Estado + ejecución -->
+  <div class="card mb-3">
+    <div class="card-body d-flex flex-column flex-md-row justify-content-between align-items-center">
+      <pre id="status" class="mb-3 mb-md-0 text-monospace small">
+Flow -- ml/s — SP --
+Servo --°
+PID --, FF --
+K K D --
+      </pre>
+      <div id="execBox" class="p-2 rounded bg-light text-center">
+        <span id="execBadge" class="badge badge-success">✔ Sistema en espera</span>
+        <button id="execBtn" class="btn btn-sm btn-primary ml-2">Activar ejecución</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Logs -->
+  <div class="card mb-3">
+    <div class="card-header p-2">
+      <a class="btn btn-link p-0" data-toggle="collapse" href="#logsCollapse">Logs ▼</a>
+    </div>
+    <div id="logsCollapse" class="collapse">
+      <div class="card-body"><div id="logs" class="logs"></div></div>
+    </div>
+  </div>
+
+  <!-- Servo 1 -->
+  <div id="s1-card" class="card mb-3">
+    <div class="card-body">
+      <h6 class="card-title text-center mb-2">
+        <span id="s1-name">Servo 1</span>
+        <span class="badge badge-light" id="s1-val">--°</span>
+      </h6>
+      <div id="s1-slider"></div>
+      <div id="pid-s1" class="card mt-2" style="display:none;">
+        <div class="card-header p-2">
+          <a class="btn btn-link p-0" data-toggle="collapse" href="#pidS1Collapse">Config. PID ▼</a>
+        </div>
+        <div id="pidS1Collapse" class="collapse">
+          <div class="card-body p-2">
+            <p class="small mb-1">PID Ángulo</p>
+            <div class="form-row">
+              <div class="col"><input id="pida-kp" class="form-control form-control-sm" type="number" step="0.1" placeholder="Kp"></div>
+              <div class="col"><input id="pida-ki" class="form-control form-control-sm" type="number" step="0.1" placeholder="Ki"></div>
+              <div class="col"><input id="pida-kd" class="form-control form-control-sm" type="number" step="0.1" placeholder="Kd"></div>
+            </div>
+            <button id="pid-s1-send" class="btn btn-success btn-sm btn-block mt-1">Guardar PID</button>
+          </div>
+        </div>
+      </div>
+      <div class="card mt-3" id="s1-chart-card" style="display:none;">
+        <div class="card-header p-2">
+          <a class="btn btn-link p-0" data-toggle="collapse" href="#s1ChartCollapse">Servo 1 ▼</a>
+        </div>
+        <div id="s1ChartCollapse" class="collapse">
+          <div class="card-body"><div class="chart-wrap"><canvas id="chart-s1"></canvas></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Servo 2 -->
+  <div id="s2-card" class="card mb-3">
+    <div class="card-body">
+      <h6 class="card-title text-center mb-2">
+        <span id="s2-name">Servo 2</span>
+        <span class="badge badge-light" id="s2-val">--°</span>
+      </h6>
+      <div id="s2-slider"></div>
+      <div id="pid-s2" class="card mt-2" style="display:none;">
+        <div class="card-header p-2">
+          <a class="btn btn-link p-0" data-toggle="collapse" href="#pidS2Collapse">Config. PID ▼</a>
+        </div>
+        <div id="pidS2Collapse" class="collapse">
+          <div class="card-body p-2">
+            <p class="small mb-1">PID Corredera</p>
+            <div class="form-row">
+              <div class="col"><input id="pidc-kp" class="form-control form-control-sm" type="number" step="0.1" placeholder="Kp"></div>
+              <div class="col"><input id="pidc-ki" class="form-control form-control-sm" type="number" step="0.1" placeholder="Ki"></div>
+              <div class="col"><input id="pidc-kd" class="form-control form-control-sm" type="number" step="0.1" placeholder="Kd"></div>
+            </div>
+            <button id="pid-s2-send" class="btn btn-success btn-sm btn-block mt-1">Guardar PID</button>
+          </div>
+        </div>
+      </div>
+      <div class="card mt-3" id="s2-chart-card" style="display:none;">
+        <div class="card-header p-2">
+          <a class="btn btn-link p-0" data-toggle="collapse" href="#s2ChartCollapse">Servo 2 ▼</a>
+        </div>
+        <div id="s2ChartCollapse" class="collapse">
+          <div class="card-body"><div class="chart-wrap"><canvas id="chart-s2"></canvas></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Control de flujo -->
+  <div class="card">
+    <div class="card-body">
+      <h6 class="card-title">Control de flujo</h6>
+
+      <div class="row text-center align-items-start">
+        <div class="col-6 col-md-4 mb-3">
+          <h6>Servo válvula <span class="badge badge-light" id="servo-val">--°</span></h6>
+          <div id="servo-slider"></div>
+        </div>
+        <div class="col-6 col-md-4 mb-3">
+          <h6>Flujo deseado <span class="badge badge-light" id="flow-val">-- ml/s</span></h6>
+          <div id="flow-slider"></div>
+        </div>
+        <div class="col-12 col-md-4 mb-3">
+          <div class="d-flex justify-content-center mb-2 flex-wrap">
+            <div class="custom-control custom-switch mx-2">
+              <input id="pid-swch" type="checkbox" class="custom-control-input">
+              <label class="custom-control-label" for="pid-swch">PID</label>
+            </div>
+              <div class="custom-control custom-switch mx-2" id="ff-switch-wrap">
+                <input id="ff-swch" type="checkbox" class="custom-control-input" checked>
+                <label class="custom-control-label" for="ff-swch">FF
+                  <small id="ffEqInline" class="text-muted d-block">y = a·x + b</small>
+                </label>
+              </div>
+          </div>
+
+          <div id="pidControls" style="display:none;" class="mb-2">
+            <div id="pid-valvula" class="form-row">
+              <div class="col"><input id="pid-kp" class="form-control form-control-sm" type="number" step="0.1" placeholder="Kp"></div>
+              <div class="col"><input id="pid-ki" class="form-control form-control-sm" type="number" step="0.1" placeholder="Ki"></div>
+              <div class="col"><input id="pid-kd" class="form-control form-control-sm" type="number" step="0.1" placeholder="Kd"></div>
+            </div>
+            <button id="pid-valve-send" class="btn btn-success btn-sm btn-block mt-1">Guardar PID</button>
+            <button id="pid-cal" class="btn btn-info btn-sm btn-block mt-1">Calibrar PID</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gráfica flujo vs SP -->
+      <div class="card mb-2">
+        <div class="card-header p-2">
+          <a class="btn btn-link p-0" data-toggle="collapse" href="#chartCollapse">Flujo vs SP ▼</a>
+        </div>
+        <div id="chartCollapse" class="collapse">
+          <div class="card-body"><div class="chart-wrap"><canvas id="chart"></canvas></div></div>
+        </div>
+      </div>
+
+        <!-- Gráfica FF -->
+        <div class="card" id="ff-card">
+        <div class="card-header p-2">
+          <a class="btn btn-link p-0" data-toggle="collapse" href="#ffCollapse">Calibración Feed-Forward ▼</a>
+        </div>
+        <div id="ffCollapse" class="collapse">
+          <div class="card-body">
+            <button id="btn-cal" class="btn btn-info btn-sm mb-2">Iniciar calibración</button>
+            <span id="cal-status" class="ml-2 badge badge-secondary badge-mini">Idle</span>
+            <p class="small mb-1">Ecuación: <span id="ff-eq">–</span></p>
+            <p class="small">
+              Vol. Req.: <span id="node-vol-req">0</span> ml |
+              Tarea: <span id="node-vol-disp-task">0</span> ml |
+              Día: <span id="node-vol-disp-day">0</span> ml
+            </p>
+            <div class="chart-wrap"><canvas id="ff-chart"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Calendario global -->
+  <div class="card">
+    <div class="card-body">
+      <h6>Calendario de todas las tareas</h6>
+      <div class="mb-2">
+        <label class="ml-3">Semana: <span id="dashWeekLabel">0</span></label>
+        <div class="d-inline-flex align-items-center ml-3">
+          <button id="dashWeekPrev" class="btn btn-sm btn-outline-secondary">&lt;</button>
+          <input type="number" id="dashWeekSlider" min="0" value="0" class="form-control form-control-sm mx-1" style="width:60px;">
+          <button id="dashWeekNext" class="btn btn-sm btn-outline-secondary">&gt;</button>
+        </div>
+      </div>
+      <div id="dash-calendar-container">
+        <div id="dash-calendar"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /#dash -->
+
+
+<!-- PLANTAS -->
+<div id="plants" class="tab-pane fade">
+
+  <h4 class="mb-3">Plantas</h4>
+
+  <div class="row">
+    <!-- formulario -->
+    <div class="col-md-4">
+      <div class="card mb-3">
+        <div class="card-body">
+          <h6>Editar planta</h6>
+
+          <input id="pl-id"   class="form-control mb-1" type="number" placeholder="ID (auto)">
+          <input id="pl-name" class="form-control mb-1" placeholder="Nombre">
+          <input id="pl-desc" class="form-control mb-1" placeholder="Descripción">
+
+          <div class="form-row mb-1">
+            <div class="col"><input id="pl-s1" class="form-control" type="number" placeholder="Servo1"></div>
+            <div class="col"><input id="pl-s2" class="form-control" type="number" placeholder="Servo2"></div>
+            <div class="col"><input id="pl-sp" class="form-control" type="number" step="0.1" placeholder="SP flow"></div>
+          </div>
+
+          <small>Inicio</small>
+          <input id="pl-start" class="form-control mb-2" type="date">
+
+          <button id="pl-save"         class="btn btn-primary  btn-block">Guardar</button>
+          <button id="pl-del"          class="btn btn-danger   btn-block mt-1">Eliminar</button>
+          <button id="pl-copy-current" class="btn btn-outline-secondary btn-block mt-2">Usar valores actuales</button>
+
+          <select id="pl-reg" class="form-control mt-2">
+            <option value="">-- Régimen --</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- lista + calendario -->
+    <div class="col-md-8">
+      <ul id="pl-list" class="list-group mb-3"></ul>
+
+      <div class="card d-none" id="pl-task-card" data-bg style="--bg-url:url('img/plant-default.png')">
+        <div class="card-body">
+          <h6>Tareas del régimen <span id="pl-task-regname"></span></h6>
+
+          <div class="mb-2">
+            <label class="ml-3">Semana:
+              <span id="plWeekLabel">0</span>
+            </label>
+            <div class="d-inline-flex align-items-center ml-3">
+              <button id="plWeekPrev" class="btn btn-sm btn-outline-secondary">&lt;</button>
+              <input type="number" id="plWeekSlider" min="0" value="0" class="form-control form-control-sm mx-1" style="width:60px;">
+              <button id="plWeekNext" class="btn btn-sm btn-outline-secondary">&gt;</button>
+            </div>
+              <input type="date" id="plInitialDate" class="form-control form-control-sm d-inline-block w-auto ml-2">
+              <small class="text-muted ml-1">(inicio)</small>
+          </div>
+
+          <div id="pl-calendar-container">
+            <div id="pl-calendar"></div>
+          </div>
+
+          <div id="taskDetailsPlanta" class="mt-3">
+            <h6>Detalles tarea</h6>
+
+            <div class="form-row">
+              <div class="col-auto"><input id="plDetailId"     class="form-control mb-2" type="number" placeholder="ID"></div>
+              <div class="col"><input  id="plDetailName"   class="form-control mb-2" type="text"   placeholder="Nombre"></div>
+              <div class="col"><input  id="plDetailDay"    class="form-control mb-2" type="number" min="0" max="6"  placeholder="Día"></div>
+              <div class="col"><input  id="plDetailHour"   class="form-control mb-2" type="number" min="0" max="23" placeholder="Hora"></div>
+              <div class="col"><input  id="plDetailMinute" class="form-control mb-2" type="number" min="0" max="59" placeholder="Min"></div>
+              <div class="col"><input  id="plDetailVolume" class="form-control mb-2" type="number" min="0"          placeholder="Vol (ml)"></div>
+            </div>
+
+            <div class="form-row mt-1">
+              <div class="col">
+                <span id="plDetailStatus" class="badge badge-secondary">Estado: --</span>
+              </div>
+              <div class="col text-right">
+                <button id="btnExecPlTask"   class="btn btn-primary btn-sm">Ejecutar</button>
+                <button id="btnUnmarkPlTask" class="btn btn-warning btn-sm">Marcar no ejecutada</button>
+                <button id="btnSavePlTask"   class="btn btn-success btn-sm">Guardar</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+
+   <!-- ===== TAB: REGÍMENES & TAREAS ===== -->
+<div id="reg" class="tab-pane fade">
+
+  <h4 class="mb-3">Regímenes &amp; Tareas</h4>
+
+  <div class="row">
+    <!-- ===== Columna izquierda – formulario de régimen + descargas ===== -->
+    <div class="col-md-4">
+      <!-- formulario -->
+      <div class="card mb-3">
+        <div class="card-body">
+          <h6>Régimen</h6>
+
+          <input id="rg-id"   class="form-control mb-1" type="number" placeholder="ID">
+          <input id="rg-name" class="form-control mb-1" placeholder="Nombre">
+          <input id="rg-desc" class="form-control mb-2" placeholder="Descripción">
+
+          <div class="btn-group btn-group-sm mb-1" role="group">
+            <button id="rg-save" class="btn btn-success">Guardar</button>
+            <button id="rg-del" class="btn btn-danger" title="Eliminar">🗑️</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- lista de regímenes -->
+      <ul id="rg-list" class="list-group mb-3"></ul>
+
+      <!-- descargas -->
+      <div class="card">
+        <div class="card-body">
+          <h6 class="mb-2">📂 Descargar archivos del sistema</h6>
+          <div class="btn-group btn-group-sm" role="group">
+            <a href="/regs.txt"   download class="btn btn-outline-primary">Regímenes</a>
+            <a href="/plants.txt" download class="btn btn-outline-success">Plantas</a>
+            <a href="/tasks.txt"  download class="btn btn-outline-warning">Tareas</a>
+          </div>
+        </div>
+      </div>
+    </div><!-- /col-md-4 -->
+
+    <!-- ===== Columna derecha – calendario y detalle de tareas ===== -->
+    <div class="col-md-8">
+      <!-- controles calendario -->
+      <div class="card mb-3">
+        <div class="card-body p-2" id="calendar-controls">
+          <label class="mr-2">
+            Semana: <span id="weekLabel">0</span>
+          </label>
+
+          <div class="d-inline-flex align-items-center ml-2">
+            <button id="weekPrev" class="btn btn-sm btn-outline-secondary">&lt;</button>
+            <input type="number" id="weekSlider" min="0" value="0" class="form-control form-control-sm mx-1" style="width:60px;">
+            <button id="weekNext" class="btn btn-sm btn-outline-secondary">&gt;</button>
+          </div>
+          <input type="date" id="initialDate" class="form-control form-control-sm d-inline-block w-auto ml-3">
+          <small class="text-muted ml-1">(inicio)</small>
+        </div>
+      </div>
+
+      <!-- calendario régimen -->
+      <div id="calendar-container" class="mb-3">
+        <div id="calendar"></div>
+      </div>
+
+      <!-- detalle tarea -->
+      <div id="taskDetails" class="card" data-bg style="--bg-url:url('img/reg-default.png')">
+        <div class="card-body">
+          <h6>Detalles tarea</h6>
+
+          <div class="form-row">
+            <div class="col-auto">
+              <input id="detailId" class="form-control mb-2" type="number" placeholder="ID">
+            </div>
+            <div class="col">
+              <input id="detailName" class="form-control mb-2" type="text" placeholder="Nombre">
+            </div>
+            <div class="col">
+              <input id="detailDay" class="form-control mb-2" type="number" min="0" max="6" placeholder="Día">
+            </div>
+            <div class="col">
+              <input id="detailHour" class="form-control mb-2" type="number" min="0" max="23" placeholder="Hora">
+            </div>
+            <div class="col">
+              <input id="detailMinute" class="form-control mb-2" type="number" min="0" max="59" placeholder="Min">
+            </div>
+            <div class="col">
+              <input id="detailVolume" class="form-control mb-2" type="number" min="0" placeholder="Vol (ml)">
+            </div>
+          </div>
+
+          <div class="form-row mt-1">
+            <div class="col">
+              <span id="detailStatus" class="badge badge-secondary">Estado: --</span>
+            </div>
+            <div class="col text-right">
+              <button id="btnExecTask"   class="btn btn-primary btn-sm">Ejecutar</button>
+              <button id="btnUnmarkTask" class="btn btn-warning btn-sm">Marcar no ejecutada</button>
+              <button id="btnSaveTask"   class="btn btn-success btn-sm">Guardar</button>
+            </div>
+          </div>
+        </div>
+      </div><!-- /taskDetails -->
+    </div><!-- /col-md-8 -->
+  </div><!-- /row -->
+</div><!-- /#reg -->
+
+<!-- CÁMARA -->
+<div id="camera" class="tab-pane fade">
+  <h4 class="mb-3">Cámara</h4>
+  <img id="cameraFeed" src="/video_feed" class="img-fluid" alt="camera">
+</div>
+
+
+  </div>
+</div>
+
+<!-- Popup tareas -->
+<div id="taskPopup" class="task-popup d-none"></div>
+
+<!-- LIBRERÍAS -->
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.6.1/nouislider.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/panel.js') }}"></script>
+</body>
+</html>
