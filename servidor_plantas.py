@@ -1,4 +1,6 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
+import threading
+import webbrowser
 from basic_gym_env.basic_env import BasicEnv
 from datetime import datetime
 from nuevo_plantas import PlantasManager
@@ -296,7 +298,92 @@ class ServidorFlask:
         return None
 
 # Instancia del servidor
+
 servidor = ServidorFlask()
+
+# --- Soporte para la interfaz web ---
+# Bloqueo para acceder al entorno desde varios hilos
+env_lock = threading.Lock()
+
+def background_task():
+    while True:
+        with env_lock:
+            servidor.env.step()
+        time.sleep(0.1)
+
+threading.Thread(target=background_task, daemon=True).start()
+
+@app.route('/', methods=['GET', 'POST'])
+def robot_control():
+    if request.method == 'POST':
+        data = request.form
+        manual_mode = data.get('manual_mode') == 'on'
+        with env_lock:
+            servidor.env.set_manual_mode(int(manual_mode))
+
+        joypad_enabled = data.get('joypad_enabled') == 'on'
+        if joypad_enabled:
+            servidor.env.enable_joypad()
+        else:
+            servidor.env.disable_joypad()
+
+        with env_lock:
+            if not manual_mode:
+                setpoint_corredera = data.get('setpoint_corredera', '0')
+                setpoint_angulo = data.get('setpoint_angulo', '0')
+                setpoint_water = data.get('setpoint_water', '0')
+                servidor.env.set_corredera(float(setpoint_corredera))
+                servidor.env.set_angulo(float(setpoint_angulo))
+                servidor.env.set_valvula(float(setpoint_water))
+            else:
+                energia_corredera = data.get('energia_corredera', '0')
+                energia_angulo = data.get('energia_angulo', '0')
+                energia_valvula = data.get('energia_valvula', '0')
+                servidor.env.set_energy_corredera(float(energia_corredera))
+                servidor.env.set_energy_angulo(float(energia_angulo))
+                servidor.env.set_energy_valvula(float(energia_valvula))
+
+            pid_params = {}
+            for pid in ['corredera', 'angulo', 'valvula']:
+                kp = data.get(f'kp_{pid}', '0')
+                ki = data.get(f'ki_{pid}', '0')
+                kd = data.get(f'kd_{pid}', '0')
+                pid_params[pid] = (float(kp), float(ki), float(kd))
+
+            servidor.env.set_pid_corredera(*pid_params['corredera'])
+            servidor.env.set_pid_angulo(*pid_params['angulo'])
+            # servidor.env.set_pid_valvula(*pid_params['valvula'])
+
+    with env_lock:
+        observation = servidor.env.get_observation()
+        if observation is not None:
+            obs_list = observation.tolist()
+            obs_dict = dict(zip(servidor.env.variable_names, obs_list))
+        else:
+            obs_dict = {}
+
+    return render_template('robot_control.html', obs=obs_dict)
+
+@app.route('/get_observation')
+def get_observation():
+    with env_lock:
+        observation = servidor.env.get_observation()
+        if observation is not None:
+            obs_list = observation.tolist()
+            obs_dict = dict(zip(servidor.env.variable_names, obs_list))
+            return jsonify(obs_dict)
+        else:
+            return jsonify({'error': 'No hay observación disponible'}), 500
+
+@app.route('/simulate_key', methods=['POST'])
+def simulate_key():
+    key = request.json.get('key')
+    if key:
+        with env_lock:
+            servidor.env.handle_key_press(key)
+        return jsonify({'status': 'Key processed'}), 200
+    else:
+        return jsonify({'error': 'No key provided'}), 400
 
 # ---- Endpoints ----
 
@@ -400,4 +487,5 @@ def manejar_plantas():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)## no colocar debug true
+    threading.Timer(1.0, lambda: webbrowser.open('http://localhost:5000/')).start()
+    app.run(host='0.0.0.0', port=5000)  # no colocar debug true
