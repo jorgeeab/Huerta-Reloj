@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Control Básico del Robot</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body class="container py-4">
+    <h1 class="mb-4">Panel Simplificado</h1>
+
+    <section class="mb-4">
+        <h3>Control Manual</h3>
+        <div class="form-row">
+            <div class="form-group col-md-4">
+                <label for="setpoint_slide">Corredera</label>
+                <input type="number" class="form-control" id="setpoint_slide" value="0">
+            </div>
+            <div class="form-group col-md-4">
+                <label for="setpoint_angle">Ángulo</label>
+                <input type="number" class="form-control" id="setpoint_angle" value="0">
+            </div>
+            <div class="form-group col-md-4">
+                <label for="setpoint_volume">Volumen</label>
+                <input type="number" class="form-control" id="setpoint_volume" value="0">
+            </div>
+        </div>
+        <button class="btn btn-primary" id="apply-setpoints">Aplicar</button>
+    </section>
+
+    <section class="mb-4">
+        <h3>Régimenes</h3>
+        <form id="reg-form" class="form-inline mb-2">
+            <input type="hidden" id="reg-id">
+            <input type="text" id="reg-name" class="form-control mr-2" placeholder="Nombre">
+            <input type="text" id="reg-desc" class="form-control mr-2" placeholder="Descripción">
+            <button type="submit" class="btn btn-success mr-2">Guardar</button>
+            <button type="button" id="reg-del" class="btn btn-danger">Eliminar</button>
+        </form>
+        <ul id="regs-list" class="list-group"></ul>
+    </section>
+
+    <section class="mb-4">
+        <h3>Plantas</h3>
+        <form id="plant-form" class="mb-2">
+            <input type="hidden" id="plant-id">
+            <div class="form-row">
+                <div class="col"><input type="text" id="plant-name" class="form-control" placeholder="Nombre"></div>
+                <div class="col"><input type="text" id="plant-desc" class="form-control" placeholder="Descripción"></div>
+                <div class="col"><input type="number" id="plant-s1" class="form-control" placeholder="Servo1"></div>
+                <div class="col"><input type="number" id="plant-s2" class="form-control" placeholder="Servo2"></div>
+                <div class="col"><input type="number" id="plant-sp" class="form-control" placeholder="Flow"></div>
+            </div>
+            <div class="form-row mt-2">
+                <div class="col"><input type="number" id="plant-day" class="form-control" placeholder="Día"></div>
+                <div class="col"><input type="number" id="plant-mon" class="form-control" placeholder="Mes"></div>
+                <div class="col"><input type="number" id="plant-yr" class="form-control" placeholder="Año"></div>
+                <div class="col"><select id="plant-reg" class="form-control"></select></div>
+            </div>
+            <div class="mt-2">
+                <button type="submit" class="btn btn-success mr-2">Guardar</button>
+                <button type="button" id="plant-del" class="btn btn-danger">Eliminar</button>
+            </div>
+        </form>
+        <ul id="plants-list" class="list-group"></ul>
+    </section>
+
+    <section class="mb-4">
+        <h3>Tareas</h3>
+        <form id="task-form" class="mb-2">
+            <input type="hidden" id="task-id">
+            <div class="form-row">
+                <div class="col"><input type="text" id="task-name" class="form-control" placeholder="Nombre"></div>
+                <div class="col"><input type="text" id="task-desc" class="form-control" placeholder="Descripción"></div>
+                <div class="col"><input type="number" id="task-off" class="form-control" placeholder="Día"></div>
+                <div class="col"><input type="number" id="task-h" class="form-control" placeholder="Hora"></div>
+                <div class="col"><input type="number" id="task-m" class="form-control" placeholder="Min"></div>
+                <div class="col"><input type="number" id="task-vol" class="form-control" placeholder="Volumen"></div>
+                <div class="col"><select id="task-reg" class="form-control"></select></div>
+            </div>
+            <div class="mt-2">
+                <button type="submit" class="btn btn-success mr-2">Guardar</button>
+                <button type="button" id="task-del" class="btn btn-danger">Eliminar</button>
+            </div>
+        </form>
+        <ul id="tasks-list" class="list-group"></ul>
+    </section>
+
+    <script src="{{ url_for('static', filename='js/simple_panel.js') }}"></script>
+</body>
+</html>
