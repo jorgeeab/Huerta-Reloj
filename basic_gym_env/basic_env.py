@@ -223,36 +223,66 @@ class BasicEnv(gym.Env):
         # Dividir la línea por comas
         values = line.strip().split(',')
 
-        if len(values) != 24:
-            print(f"Error: expected 24 values, got {len(values)}")
+        if len(values) not in (21, 24):
+            print(f"Error: expected 21 or 24 values, got {len(values)}")
             return
 
+        # Valores por defecto para el formato reducido
+        inputV = 0.0
+        calibrando_X = 0
+        calibrando_A = 0
+        kpV = kiV = kdV = 0.0
+
         try:
-            # Asignar los valores a las variables correspondientes
-            inputX = float(values[0])
-            inputA = float(values[1])
-            inputV = float(values[2])
-            flowVolume = float(values[3])
-            limite_X = int(values[4])
-            limite_A = int(values[5])
-            calibrando_X = int(values[6])
-            calibrando_A = int(values[7])
-            manualMotorX = int(values[8])
-            manualMotorA = int(values[9])
-            manualMotorV = int(values[10])
-            modoManual = int(values[11])
-            kpX = float(values[12])
-            kiX = float(values[13])
-            kdX = float(values[14])
-            kpA = float(values[15])
-            kiA = float(values[16])
-            kdA = float(values[17])
-            kpV = float(values[18])
-            kiV = float(values[19])
-            kdV = float(values[20])
-            stepsPerMM = float(values[21])
-            stepsPerDegree = float(values[22])
-            flowCalibFactor = float(values[23])
+            if len(values) == 21:
+                # Formato sin parametros PID de la válvula
+                inputX = float(values[0])
+                inputA = float(values[1])
+                flowVolume = float(values[2])
+                inputV = float(values[3])
+                limite_X = int(values[4])
+                limite_A = int(values[5])
+                calibrando_X = int(values[6])
+                calibrando_A = int(values[7])
+                manualMotorX = int(values[8])
+                manualMotorA = int(values[9])
+                manualMotorV = int(values[10])
+                modoManual = int(values[11])
+                kpX = float(values[12])
+                kiX = float(values[13])
+                kdX = float(values[14])
+                kpA = float(values[15])
+                kiA = float(values[16])
+                kdA = float(values[17])
+                stepsPerMM = float(values[18])
+                stepsPerDegree = float(values[19])
+                flowCalibFactor = float(values[20])
+            else:
+                # Formato completo de 24 valores
+                inputX = float(values[0])
+                inputA = float(values[1])
+                inputV = float(values[2])
+                flowVolume = float(values[3])
+                limite_X = int(values[4])
+                limite_A = int(values[5])
+                calibrando_X = int(values[6])
+                calibrando_A = int(values[7])
+                manualMotorX = int(values[8])
+                manualMotorA = int(values[9])
+                manualMotorV = int(values[10])
+                modoManual = int(values[11])
+                kpX = float(values[12])
+                kiX = float(values[13])
+                kdX = float(values[14])
+                kpA = float(values[15])
+                kiA = float(values[16])
+                kdA = float(values[17])
+                kpV = float(values[18])
+                kiV = float(values[19])
+                kdV = float(values[20])
+                stepsPerMM = float(values[21])
+                stepsPerDegree = float(values[22])
+                flowCalibFactor = float(values[23])
 
             # Crear el array de observación
             obs = np.array([
