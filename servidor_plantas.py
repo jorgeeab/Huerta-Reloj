@@ -634,4 +634,4 @@ def api_robot_info():
 
 if __name__ == '__main__':
     threading.Timer(1.0, lambda: webbrowser.open('http://localhost:5000/')).start()
-    app.run(host='0.0.0.0', port=5000)  # no colocar debug true
+    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)

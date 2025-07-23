@@ -14,7 +14,7 @@ By default the server binds to `0.0.0.0` on port `5000`:
 
 ```python
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
 ```
 
 Once running, you can interact with the API using HTTP requests. The main endpoints include:

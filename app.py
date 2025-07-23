@@ -139,4 +139,4 @@ def toggle_connection():
             env.disconnect_serial()
     return redirect(url_for('robot_control'))
 if __name__ == '__main__':
-    app.run(debug=False)
+    app.run(debug=False, use_reloader=False)
