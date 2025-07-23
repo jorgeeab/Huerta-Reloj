@@ -94,6 +94,10 @@ class BasicEnv(gym.Env):
         self.baudrate = baudrate
         self.ser = None
         self.read_thread = None
+        # Track attempts to connect to the serial port so we don't spam
+        # connection errors when the port is unavailable.
+        self.last_serial_attempt = 0
+        self.serial_error_logged = False
 
         if self.mode == 'serial':
             self.connect_serial()
@@ -169,14 +173,24 @@ class BasicEnv(gym.Env):
         if self.mode != 'serial':
             return False
         if self.ser is not None and self.ser.is_open:
-            self.ser.close()
+            return True
+
+        # Throttle connection attempts to avoid spamming when the port is busy
+        now = time.time()
+        if now - self.last_serial_attempt < 2:
+            return False
+        self.last_serial_attempt = now
+
         try:
             self.ser = serial.Serial(self.port, self.baudrate, timeout=0.3)
             time.sleep(2)
             print("Conectado al puerto serial", self.port)
+            self.serial_error_logged = False
             return True
         except serial.SerialException as e:
-            print(f"Error al conectar al puerto serial: {e}")
+            if not self.serial_error_logged:
+                print(f"Error al conectar al puerto serial: {e}")
+                self.serial_error_logged = True
             self.ser = None
             return False
 
@@ -185,12 +199,14 @@ class BasicEnv(gym.Env):
         if self.ser is not None and self.ser.is_open:
             self.ser.close()
             print("Desconectado del puerto serial")
+        self.serial_error_logged = False
 
     def change_port(self, new_port):
         """Cambiar de puerto y reconectar."""
         self.port = new_port
         if self.mode == 'serial':
             self.disconnect_serial()
+            self.last_serial_attempt = 0
             self.connect_serial()
 
     def read_serial(self):
