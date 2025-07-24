@@ -4,10 +4,10 @@ This document summarizes how to launch the Flask servers and access the interfac
 
 ## Running the API Server
 
-The API endpoints are implemented in `servidor_plantas_3.py`. Run the server with:
+The API endpoints are implemented in `servidor_plantas.py`. Run the server with:
 
 ```bash
-python servidor_plantas_3.py
+python servidor_plantas.py
 ```
 
 By default the server binds to `0.0.0.0` on port `5000`:
@@ -30,10 +30,10 @@ Once running, you can interact with the API using HTTP requests. The main endpoi
 
 ## Opening the Control Interface
 
-A basic web interface for manual control is served by `app.py`. Start it with:
+A basic web interface for manual control is served by `servidor_plantas.py`. Start it with:
 
 ```bash
-python app.py
+python servidor_plantas.py
 ```
 
 This will launch a local server (port 5000 by default). Open your browser and navigate to:
@@ -42,7 +42,7 @@ This will launch a local server (port 5000 by default). Open your browser and na
 http://localhost:5000/
 ```
 
-The page `robot_control.html` from the `templates` directory will be displayed, allowing manual control and observation of the environment.
+The page `panel.html` from the `templates` directory will be displayed, allowing manual control and observation of the environment.
 
 ## Notes
 
