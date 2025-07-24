@@ -611,6 +611,38 @@ class BasicEnv(gym.Env):
     def calibrate_A(self, calibrate):
         self.current_action[17] = int(calibrate)
 
+    def handle_key_press(self, key):
+        """Update setpoints or energies based on a keyboard key press."""
+        manual = int(self.current_action[0]) == 1
+        if manual:
+            if key == 'Up':
+                self.set_energy_corredera(self.current_action[2] + 1)
+            elif key == 'Down':
+                self.set_energy_corredera(self.current_action[2] - 1)
+            elif key == 'Right':
+                self.set_energy_angulo(self.current_action[1] + 1)
+            elif key == 'Left':
+                self.set_energy_angulo(self.current_action[1] - 1)
+            elif key == 'w':
+                self.set_energy_valvula(self.current_action[3] + 1)
+            elif key == 's':
+                self.set_energy_valvula(self.current_action[3] - 1)
+        else:
+            if key == 'Up':
+                self.set_corredera(self.current_action[4] + 10)
+            elif key == 'Down':
+                self.set_corredera(self.current_action[4] - 10)
+            elif key == 'Right':
+                self.set_angulo(self.current_action[5] + 10)
+            elif key == 'Left':
+                self.set_angulo(self.current_action[5] - 10)
+            elif key == 'w':
+                self.set_valvula(self.current_action[6] + 1)
+            elif key == 's':
+                self.set_valvula(self.current_action[6] - 1)
+
+        self.step()
+
     def store_step(self, obs, reward):
         step_data = np.append(obs, reward)
         self.execution_data.append(step_data)
