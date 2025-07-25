@@ -238,7 +238,10 @@ class App(tk.Tk):
         try:
             value = slider.get()
             self.current_env.set_motor_energy(motor, value)
-            print(f"Sent {motor} motor command with value: {value}")
+            msg = f"Sent {motor} motor command with value: {value}\n"
+            self.data_text_sent.insert(tk.END, msg)
+            self.data_text_sent.see(tk.END)
+            print(msg.strip())
         except ValueError as e:
             print(f"Invalid input: {e}")
 
@@ -283,38 +286,61 @@ class App(tk.Tk):
 
     def toggle_manual_mode(self):
         manual_mode = self.manual_mode_var.get()
-        print(f"Setting manual mode to {'ON' if manual_mode else 'OFF'}")
+        msg = f"Set manual mode to {'ON' if manual_mode else 'OFF'}\n"
         self.current_env.set_manual_mode(manual_mode)
+        self.data_text_sent.insert(tk.END, msg)
+        self.data_text_sent.see(tk.END)
+        print(msg.strip())
 
     def calibrate_compass(self):
         self.current_env.calibrate_compass()
+        msg = "Sent compass calibration command\n"
+        self.data_text_sent.insert(tk.END, msg)
+        self.data_text_sent.see(tk.END)
+        print(msg.strip())
 
     def reset_robot(self):
         self.current_env.reset()
+        msg = "Sent reset command\n"
+        self.data_text_sent.insert(tk.END, msg)
+        self.data_text_sent.see(tk.END)
+        print(msg.strip())
 
     def toggle_virtual_connection(self):
         if self.env_virtual.ser is None or not self.env_virtual.ser.is_open:
             self.env_virtual.port = self.virtual_port.get()
             if self.env_virtual.connect_serial():
                 self.virtual_connect_button.config(bg="green", text="Desconectar Virtual")
+                msg = "Connected Virtual\n"
             else:
                 self.virtual_connect_button.config(bg="red", text="Conectar Virtual")
+                msg = "Failed Virtual connection\n"
         else:
             self.env_virtual.disconnect_serial()
             self.virtual_connect_button.config(bg="black", text="Conectar Virtual")
+            msg = "Disconnected Virtual\n"
         self.update_button_states()
+        self.data_text_sent.insert(tk.END, msg)
+        self.data_text_sent.see(tk.END)
+        print(msg.strip())
 
     def toggle_real_connection(self):
         if self.env_real.ser is None or not self.env_real.ser.is_open:
             self.env_real.port = self.real_port.get()
             if self.env_real.connect_serial():
                 self.real_connect_button.config(bg="green", text="Desconectar Real")
+                msg = "Connected Real\n"
             else:
                 self.real_connect_button.config(bg="red", text="Conectar Real")
+                msg = "Failed Real connection\n"
         else:
             self.env_real.disconnect_serial()
             self.real_connect_button.config(bg="black", text="Conectar Real")
+            msg = "Disconnected Real\n"
         self.update_button_states()
+        self.data_text_sent.insert(tk.END, msg)
+        self.data_text_sent.see(tk.END)
+        print(msg.strip())
 
     def switch_env(self):
         if self.current_env.ser is None or not self.current_env.ser.is_open:

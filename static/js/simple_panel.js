@@ -36,6 +36,49 @@ byId('apply-setpoints').addEventListener('click', async () => {
     }
 });
 
+// ----- Volumen -----
+byId('send-volume').addEventListener('click', async () => {
+    const payload = { setpoints: { volume: parseFloat(byId('vol_req').value || '0') } };
+    await fetch('/entorno/actualizar_acciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+});
+
+byId('reset-volume').addEventListener('click', async () => {
+    await fetch('/entorno/actualizar_acciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reset_volume: true })
+    });
+});
+
+// ----- Calibración -----
+byId('apply-calib').addEventListener('click', async () => {
+    const payload = {
+        calibrations: {
+            stepsPerMM: parseFloat(byId('steps_mm').value || '0'),
+            stepsPerDegree: parseFloat(byId('steps_deg').value || '0')
+        }
+    };
+    await fetch('/entorno/actualizar_acciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+});
+
+// ----- PID switch -----
+byId('pidSwitch').addEventListener('change', async e => {
+    const payload = { manual_mode: e.target.checked ? 0 : 1 };
+    await fetch('/entorno/actualizar_acciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+});
+
 // ----- Régimenes -----
 async function loadRegs(){
     const regs = await api('/api/regs');
