@@ -15,6 +15,13 @@
     <h1 class="mb-4">Panel Simplificado</h1>
 
     <section class="mb-4">
+        <div class="custom-control custom-switch">
+            <input type="checkbox" class="custom-control-input" id="pidSwitch" checked>
+            <label class="custom-control-label" for="pidSwitch">Usar control PID</label>
+        </div>
+    </section>
+
+    <section class="mb-4">
         <h3>Control Manual</h3>
         <div class="form-row">
             <div class="form-group col-md-4">
@@ -93,6 +100,35 @@
             </div>
         </form>
         <ul id="tasks-list" class="list-group"></ul>
+    </section>
+
+    <section class="mb-4">
+        <h3>Volumen de Riego</h3>
+        <div class="form-row">
+            <div class="form-group col-md-6">
+                <label for="vol_req">Objetivo (ml)</label>
+                <input type="number" class="form-control" id="vol_req" value="0">
+            </div>
+            <div class="form-group col-md-6 d-flex align-items-end">
+                <button class="btn btn-warning mr-2" id="reset-volume">Reset</button>
+                <button class="btn btn-primary" id="send-volume">Enviar</button>
+            </div>
+        </div>
+    </section>
+
+    <section class="mb-4">
+        <h3>Calibración</h3>
+        <div class="form-row">
+            <div class="form-group col-md-6">
+                <label for="steps_mm">Pasos por mm</label>
+                <input type="number" class="form-control" id="steps_mm" value="0">
+            </div>
+            <div class="form-group col-md-6">
+                <label for="steps_deg">Pasos por grado</label>
+                <input type="number" class="form-control" id="steps_deg" value="0">
+            </div>
+        </div>
+        <button class="btn btn-primary" id="apply-calib">Guardar</button>
     </section>
 
     <section class="mb-4">

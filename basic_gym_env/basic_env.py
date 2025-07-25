@@ -569,6 +569,27 @@ class BasicEnv(gym.Env):
                                  self.action_space.high[6])
         self.current_action[6] = round(setpoint_water, 1)
 
+    # --- Nuevos métodos para control de volumen y calibraciones ---
+    def set_volumen_requerido(self, volumen):
+        """Configura el volumen de riego deseado."""
+        volumen = np.clip(volumen,
+                          self.action_space.low[6],
+                          self.action_space.high[6])
+        self.current_action[6] = round(volumen, 1)
+
+    def reset_volumen(self):
+        """Restablece el volumen acumulado en el controlador."""
+        # No existe un índice dedicado en la acción; por ahora se envía cero
+        self.current_action[6] = 0
+
+    def set_steps_per_mm(self, steps):
+        """Ajusta la calibración de pasos por milímetro."""
+        self.current_action[18] = float(steps)
+
+    def set_steps_per_degree(self, steps):
+        """Ajusta la calibración de pasos por grado."""
+        self.current_action[19] = float(steps)
+
     def set_energy_corredera(self, energia_corredera):
         energia_corredera = np.clip(energia_corredera,
                                     self.action_space.low[2],
@@ -604,6 +625,15 @@ class BasicEnv(gym.Env):
 
     def set_manual_mode(self, manual_mode):
         self.current_action[0] = int(manual_mode)
+        self.manual_mode = int(manual_mode)
+
+    def enable_pid(self):
+        """Switch to automatic mode using PIDs for control."""
+        self.set_manual_mode(0)
+
+    def disable_pid(self):
+        """Switch to manual mode bypassing the PIDs."""
+        self.set_manual_mode(1)
 
     def calibrate_X(self, calibrate):
         self.current_action[16] = int(calibrate)
@@ -640,6 +670,13 @@ class BasicEnv(gym.Env):
                 self.set_valvula(self.current_action[6] + 1)
             elif key == 's':
                 self.set_valvula(self.current_action[6] - 1)
+
+        if key == 'm':
+            if manual:
+                self.enable_pid()
+            else:
+                self.disable_pid()
+            print(f"Modo cambiado a {'Manual' if self.manual_mode else 'Automático'}")
 
         self.step()
 

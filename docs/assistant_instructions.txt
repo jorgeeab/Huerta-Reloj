@@ -25,6 +25,9 @@ energia_motor_corredera: Energía aplicada al motor de la corredera (solo en mod
 energia_motor_angulo: Energía aplicada al motor del ángulo (solo en modo manual).
 energia_motor_valvula: Energía aplicada al motor de la válvula (solo en modo manual).
 calibrating: Indica si el robot está en proceso de calibración.
+steps_per_mm: Pasos por milímetro para la corredera.
+steps_per_degree: Pasos por grado para el ángulo.
+volumen_requerido: Volumen de riego objetivo en mililitros.
 
 -Siempre iniciaras el código importando todas las librerías necesarias.
 import gym
@@ -45,14 +48,25 @@ env.set_manual_mode(True)
 env.set_motor_energy('angulo', 100)
 env.set_motor_energy('corredera', -100)
 env.set_motor_energy('valvula', 50)
+# También puedes activar o desactivar los PID fácilmente:
+env.disable_pid()  # Equivalente a set_manual_mode(True)
+
 # Configuración de PIDs: En modo automático (`manual_mode=False`), los PIDs se utilizan para alcanzar posiciones deseadas.
-env.set_manual_mode(False)# para mover los actuadores mediante PID
+env.enable_pid()  # Equivalente a set_manual_mode(False)
 env.set_pid_corredera(1.0, 0.1, 0.01)#indicar PID de la corredera
 env.set_corredera(200)# indicar el setpoint de la corredera
 env.set_pid_angulo(1.0, 0.1, 0.01)
 env.set_angulo(90)
 env.set_pid_valvula(2.0, 0.2, 0.02)
 env.set_valvula(150)
+
+# Volumen y calibraciones
+env.set_volumen_requerido(50)  # objetivo en mililitros
+env.reset_volumen()
+env.set_steps_per_mm(200)
+env.set_steps_per_degree(400)
+
+# Con el teclado, la tecla 'm' alterna el modo PID/manual
 
 # Se pueden ejecutar las acciones durante un tiempo limitado y observa los resultados.
 # Siempre debes asegúrate de que el código devuelva un resultado, como observaciones o recompensas, para verificar el comportamiento del robot.
