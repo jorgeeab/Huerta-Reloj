@@ -38,46 +38,58 @@ class ServidorFlask:
         # Inicializamos el entorno y el gestor de plantas
         self.env = BasicEnv(port='COM5', baudrate=115200)
         self.manager = PlantasManager()
+        self.logs = []
+
+    def log(self, message):
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        entry = f"[{timestamp}] {message}"
+        self.logs.append(entry)
+        if len(self.logs) > 100:
+            self.logs.pop(0)
+        print(entry)
 
     # ---- Métodos de Control del Entorno ----
     def actualizar_acciones(self, data):
         try:
-            print("Debug: Ingresando a actualizar_acciones")  # Debug
-            print("Debug: Data recibida:", data)  # Debug
+            self.log("Ingresando a actualizar_acciones")
+            self.log(f"Data recibida: {data}")
 
             # Actualizar el modo manual si se proporciona
             manual_mode = data.get('manual_mode')
             if manual_mode is not None:
                 self.env.set_manual_mode(int(manual_mode))
-                print(f"Debug: manual_mode actualizado a {manual_mode}")  # Debug
+                self.log(f"manual_mode actualizado a {manual_mode}")
 
             # Configurar joypad si se proporciona
             joypad_action = data.get('joypad_action')
             if joypad_action:
                 if joypad_action == 'enable':
                     self.env.enable_joypad()
-                    print("Debug: Joypad habilitado")  # Debug
+                    self.log("Joypad habilitado")
                 elif joypad_action == 'disable':
                     self.env.disable_joypad()
-                    print("Debug: Joypad deshabilitado")  # Debug
+                    self.log("Joypad deshabilitado")
 
             # Actualizar setpoints si se proporcionan
             setpoints = data.get('setpoints', {})
             for component, value in setpoints.items():
                 if component == 'slide':
                     self.env.set_corredera(value)
-                    print(f"Debug: Setpoint slide actualizado a {value}")  # Debug
+                    self.log(f"Setpoint slide actualizado a {value}")
                 elif component == 'angle':
                     self.env.set_angulo(value)
-                    print(f"Debug: Setpoint angle actualizado a {value}")  # Debug
+                    self.log(f"Setpoint angle actualizado a {value}")
                 elif component == 'volume':
                     self.env.set_volumen_requerido(value)
-                    print(f"Debug: Setpoint volume actualizado a {value}")  # Debug
+                    self.log(f"Setpoint volume actualizado a {value}")
+                elif component == 'valve_motor':
+                    self.env.set_valvula(value)
+                    self.log(f"Setpoint valve actualizado a {value}")
 
             # Verificar si se debe resetear el volumen
             if data.get('reset_volume', False):
                 self.env.reset_volumen()
-                print("Debug: Volumen reiniciado a cero")  # Debug
+                self.log("Volumen reiniciado a cero")
 
             # Actualizar configuraciones de PID si se proporcionan
             pid_settings = data.get('pid_settings', {})
@@ -87,14 +99,14 @@ class ServidorFlask:
                 kdX = pid_settings.get('kdX')
                 if kpX is not None and kiX is not None and kdX is not None:
                     self.env.set_pid_corredera(kpX, kiX, kdX)
-                    print(f"PID de corredera actualizado: kp={kpX}, ki={kiX}, kd={kdX}")
+                    self.log(f"PID de corredera actualizado: kp={kpX}, ki={kiX}, kd={kdX}")
 
                 kpA = pid_settings.get('kpA')
                 kiA = pid_settings.get('kiA')
                 kdA = pid_settings.get('kdA')
                 if kpA is not None and kiA is not None and kdA is not None:
                     self.env.set_pid_angulo(kpA, kiA, kdA)
-                    print(f"PID de ángulo actualizado: kp={kpA}, ki={kiA}, kd={kdA}")
+                    self.log(f"PID de ángulo actualizado: kp={kpA}, ki={kiA}, kd={kdA}")
 
             # Actualizar calibraciones si se proporcionan
             calibrations = data.get('calibrations', {})
@@ -103,10 +115,10 @@ class ServidorFlask:
                 stepsPerDegree = calibrations.get('stepsPerDegree')
                 if stepsPerMM is not None:
                     self.env.set_steps_per_mm(stepsPerMM)
-                    print(f"Calibración stepsPerMM actualizada: {stepsPerMM}")
+                    self.log(f"Calibración stepsPerMM actualizada: {stepsPerMM}")
                 if stepsPerDegree is not None:
                     self.env.set_steps_per_degree(stepsPerDegree)
-                    print(f"Calibración stepsPerDegree actualizada: {stepsPerDegree}")
+                    self.log(f"Calibración stepsPerDegree actualizada: {stepsPerDegree}")
 
             # Actualizar energías de los motores en modo manual si se proporciona
             motor_energies = data.get('motor_energies', {})
@@ -117,18 +129,18 @@ class ServidorFlask:
 
                 if energy_corredera is not None:
                     self.env.set_energy_corredera(energy_corredera)
-                    print(f"Debug: Energía del motor de corredera actualizada a {energy_corredera}")
+                    self.log(f"Energía del motor de corredera actualizada a {energy_corredera}")
                 if energy_angulo is not None:
                     self.env.set_energy_angulo(energy_angulo)
-                    print(f"Debug: Energía del motor de ángulo actualizada a {energy_angulo}")
+                    self.log(f"Energía del motor de ángulo actualizada a {energy_angulo}")
                 if energy_valvula is not None:
                     self.env.set_energy_valvula(energy_valvula)
-                    print(f"Debug: Energía del motor de válvula actualizada a {energy_valvula}")
+                    self.log(f"Energía del motor de válvula actualizada a {energy_valvula}")
             # Realizamos un paso de simulación con la configuración actual
             self.env.step()
             return jsonify({'status': 'Configuración del entorno actualizada'}), 200
         except Exception as e:
-            print(f"Debug: Error en actualizar_acciones - {str(e)}")  # Debug
+            self.log(f"Error en actualizar_acciones - {str(e)}")
             return jsonify({'error': f'Error en el servidor: {str(e)}'}), 500
 
     # En la clase ServidorFlask:
@@ -141,8 +153,7 @@ class ServidorFlask:
                                                          intervalo=intervalo)
 
                 if not obs_data or 'error' in obs_data:
-                    print(
-                        "Debug: No se encontraron observaciones dentro del rango de tiempo o con el intervalo especificado")
+                    self.log("No se encontraron observaciones dentro del rango de tiempo o con el intervalo especificado")
                     return jsonify({'error': 'No se encontraron observaciones representativas'}), 400
 
                 # Construir una lista de observaciones en formato de diccionario
@@ -157,13 +168,13 @@ class ServidorFlask:
                 if obs is not None:
                     obs_list = [float(val) for val in obs.tolist()]
                     obs_dict = dict(zip(self.env.variable_names, obs_list))
-                    print("Debug: Observación obtenida:", obs_dict)
+                    self.log(f"Observación obtenida: {obs_dict}")
                     return jsonify({'state': obs_dict}), 200
                 else:
-                    print("Debug: No hay observación disponible")
+                    self.log("No hay observación disponible")
                     return jsonify({'error': 'No hay observación disponible'}), 400
         except Exception as e:
-            print(f"Debug: Error en obtener_estado_entorno - {str(e)}")
+            self.log(f"Error en obtener_estado_entorno - {str(e)}")
             return jsonify({'error': f'Error en el servidor: {str(e)}'}), 500
 
     # Nuevos métodos para cada acción de controlar_entorno
@@ -195,7 +206,7 @@ class ServidorFlask:
                         return jsonify(
                             {'error': f'El protocolo "{protocolo_nombre}" no contiene una función válida.'}), 400
                 except Exception as e:
-                    print(f"Error al cargar el protocolo '{protocolo_nombre}': {e}")
+                    self.log(f"Error al cargar el protocolo '{protocolo_nombre}': {e}")
 
             if protocolo is None and custom_code:
                 try:
@@ -216,7 +227,7 @@ class ServidorFlask:
             while time.time() - start_time < execution_time:
                 obs = self.env.get_observation()
                 if obs is None:
-                    print("No se pudo obtener la observación.")
+                    self.log("No se pudo obtener la observación.")
                     continue
 
                 # Llamamos a 'protocolo' pasando 'self.env' como argumento
@@ -240,7 +251,7 @@ class ServidorFlask:
         except ValueError as e:
             return jsonify({"error": str(e)}), 400
         except Exception as e:
-            print(f"Error inesperado: {e}")
+            self.log(f"Error inesperado: {e}")
             return jsonify({"error": f"Error inesperado: {str(e)}"}), 500
 
     def stop_batch_action(self):
@@ -386,7 +397,9 @@ def robot_control():
             obs_dict = {}
         serial_connected = servidor.env.ser is not None and servidor.env.ser.is_open
 
-    return render_template('panel.html',
+    # Usamos el panel simplificado que trabaja con los endpoints
+    # del entorno Flask para enviar las acciones al robot.
+    return render_template('simple_panel.html',
                            obs=obs_dict,
                            current_port=servidor.env.port,
                            serial_connected=serial_connected)
@@ -459,7 +472,7 @@ def reset():
 def actualizar_acciones():
     data = request.json
     if not data:
-        print("Debug: No se enviaron datos en la solicitud a /entorno/actualizar_acciones")  # Debug
+        servidor.log("No se enviaron datos en la solicitud a /entorno/actualizar_acciones")
         return jsonify({"error": "No se enviaron datos."}), 400
     return servidor.actualizar_acciones(data)
 
@@ -468,7 +481,7 @@ def actualizar_acciones():
 def obtener_estado():
     data = request.json
     if not data:
-        print("Debug: No se enviaron datos en la solicitud a /entorno/obtener_estado")
+        servidor.log("No se enviaron datos en la solicitud a /entorno/obtener_estado")
         data = {}
 
     # Extraer los parámetros 'tiempo' e 'intervalo' de los datos recibidos
@@ -629,6 +642,11 @@ def api_robot_info():
         'pidEditable': True
     }
     return jsonify(info)
+
+
+@app.route('/logs')
+def api_logs():
+    return jsonify({'logs': servidor.logs})
 
 
 
