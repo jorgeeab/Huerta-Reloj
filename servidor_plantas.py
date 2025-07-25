@@ -397,9 +397,9 @@ def robot_control():
             obs_dict = {}
         serial_connected = servidor.env.ser is not None and servidor.env.ser.is_open
 
-    # Usamos el panel simplificado que trabaja con los endpoints
-    # del entorno Flask para enviar las acciones al robot.
-    return render_template('simple_panel.html',
+    # Renderizamos la interfaz completa con dashboard y calendarios
+    # que utiliza los mismos endpoints del entorno Flask.
+    return render_template('panel.html',
                            obs=obs_dict,
                            current_port=servidor.env.port,
                            serial_connected=serial_connected)
@@ -647,6 +647,119 @@ def api_robot_info():
 @app.route('/logs')
 def api_logs():
     return jsonify({'logs': servidor.logs})
+
+# --- Compatibilidad con la interfaz avanzada -----------------
+@app.route('/status')
+def status():
+    """Devuelve un resumen del estado actual del entorno."""
+    obs = servidor.env.get_observation()
+    if obs is None:
+        return jsonify({'error': 'No hay observación disponible'}), 500
+    obs_list = obs.tolist()
+    obs_dict = dict(zip(servidor.env.variable_names, obs_list))
+
+    data = {
+        'flow': obs_dict.get('inputV', 0),
+        'setpoint': servidor.env.current_action[6],
+        'servo': obs_dict.get('inputA', 0),
+        's1': obs_dict.get('inputA', 0),
+        's2': obs_dict.get('inputX', 0),
+        'pidOn': servidor.env.manual_mode == 0,
+        'ffOn': False,
+        'Kp': servidor.env.current_action[13],
+        'Ki': servidor.env.current_action[14],
+        'Kd': servidor.env.current_action[15],
+        'KpC': servidor.env.current_action[7],
+        'KiC': servidor.env.current_action[8],
+        'KdC': servidor.env.current_action[9],
+        'KpA': servidor.env.current_action[10],
+        'KiA': servidor.env.current_action[11],
+        'KdA': servidor.env.current_action[12],
+        'volReq': servidor.env.current_action[6],
+        'volDispTask': 0,
+        'volDispAcumDay': 0,
+        'autoExecEnabled': False,
+    }
+    return jsonify(data)
+
+
+@app.route('/control', methods=['GET', 'POST'])
+def control():
+    """Actualiza actuadores o parámetros PID desde la interfaz."""
+    params = request.form if request.method == 'POST' else request.args
+
+    servo = params.get('servo')
+    pin = params.get('pin')
+    flow = params.get('flow')
+    pid = params.get('pid')
+
+    if servo is not None:
+        try:
+            val = float(servo)
+            if pin == '1':
+                servidor.env.set_angulo(val)
+            elif pin == '2':
+                servidor.env.set_corredera(val)
+            else:
+                servidor.env.set_valvula(val)
+        except ValueError:
+            pass
+
+    if flow is not None:
+        try:
+            servidor.env.set_valvula(float(flow))
+        except ValueError:
+            pass
+
+    if pid is not None:
+        servidor.env.enable_pid() if pid == '1' else servidor.env.disable_pid()
+
+    if request.method == 'POST':
+        def _flt(name):
+            try:
+                return float(params.get(name))
+            except (TypeError, ValueError):
+                return None
+
+        kp = _flt('kp'); ki = _flt('ki'); kd = _flt('kd')
+        if kp is not None and ki is not None and kd is not None:
+            servidor.env.set_pid_valvula(kp, ki, kd)
+
+        kpa = _flt('kpa'); kia = _flt('kia'); kda = _flt('kda')
+        if kpa is not None and kia is not None and kda is not None:
+            servidor.env.set_pid_angulo(kpa, kia, kda)
+
+        kpc = _flt('kpc'); kic = _flt('kic'); kdc = _flt('kdc')
+        if kpc is not None and kic is not None and kdc is not None:
+            servidor.env.set_pid_corredera(kpc, kic, kdc)
+
+    servidor.env.step()
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/current_ip')
+def current_ip():
+    return jsonify({'ip': request.host.split(':')[0]})
+
+
+@app.route('/getFeedForward')
+def get_feed_forward():
+    return jsonify({'flow': [], 'angle': [], 'a0': 0, 'b0': 0})
+
+
+@app.route('/ejecutar_tarea')
+def ejecutar_tarea():
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/api/calibrate_pid')
+def api_calibrate_pid():
+    return jsonify({'kp': 0, 'ki': 0, 'kd': 0})
+
+
+@app.route('/api/calibrate_flow')
+def api_calibrate_flow():
+    return jsonify({'status': 'ok'})
 
 
 
