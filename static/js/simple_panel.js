@@ -20,7 +20,8 @@ byId('apply-setpoints').addEventListener('click', async () => {
         setpoints: {
             slide: parseFloat(byId('setpoint_slide').value || '0'),
             angle: parseFloat(byId('setpoint_angle').value || '0'),
-            volume: parseFloat(byId('setpoint_volume').value || '0')
+            volume: parseFloat(byId('setpoint_volume').value || '0'),
+            valve_motor: parseFloat(byId('valve_motor').value || '0')
         }
     };
     try {
@@ -193,4 +194,17 @@ byId('task-del').addEventListener('click', async () => {
 // ----- Inicial -----
 window.addEventListener('DOMContentLoaded', () => {
     loadRegs().then(() => { loadPlants(); loadTasks(); });
+    pollLogs();
+    setInterval(pollLogs, 5000);
 });
+
+async function pollLogs(){
+    try{
+        const data = await api('/logs');
+        byId('logs').innerHTML = data.logs.join('<br>');
+        const logsDiv = byId('logs');
+        logsDiv.scrollTop = logsDiv.scrollHeight;
+    }catch(e){
+        console.warn(e);
+    }
+}
