@@ -248,14 +248,14 @@ window.addEventListener('DOMContentLoaded', () => {
     options:{responsive:true,animation:false,maintainAspectRatio:false,
       interaction:{mode:'index',intersect:false},scales:{x:{display:false}}}});
 
-  /* ===== Gráficas Servo1 / Servo2 =========================== */
+  /* ===== Gráficas Corredera / Ángulo ======================= */
   let chartS1=null,chartS2=null;
   const dataS1={labels:[],datasets:[
-    {label:'Servo1',data:[],borderWidth:1,fill:false},
+    {label:'Corredera',data:[],borderWidth:1,fill:false},
     {label:'Setpoint',data:[],borderWidth:1,fill:false,borderDash:[4,4]}
   ]};
   const dataS2={labels:[],datasets:[
-    {label:'Servo2',data:[],borderWidth:1,fill:false},
+    {label:'Ángulo',data:[],borderWidth:1,fill:false},
     {label:'Setpoint',data:[],borderWidth:1,fill:false,borderDash:[4,4]}
   ]};
   if(qs('#chart-s1')){
@@ -324,7 +324,7 @@ window.addEventListener('DOMContentLoaded', () => {
       lastStatus = st;
       const lines = [
         `Flow ${( +st.flow ).toFixed(1)} ml/s — SP ${( +st.setpoint ).toFixed(1)}`,
-        `Servo ${ st.servo ?? '--'}°`
+        `Ángulo ${ st.servo ?? '--'}°`
       ];
       if(pidEditable && 'Kp' in st){
         lines.push(`PID ${ st.pidOn ? 'ON':'OFF'}, FF ${ st.ffOn ? 'ON':'OFF'}`);
