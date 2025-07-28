@@ -638,7 +638,8 @@ def api_robot_info():
     info = {
         'type': 'basic_env',
         'sensors': servidor.env.variable_names,
-        'motors': ['servo1', 'servo2', 'valve'],
+        # Mostrar los actuadores con nombres en español para la interfaz
+        'motors': ['Corredera', 'Ángulo', 'Válvula'],
         'pidEditable': True
     }
     return jsonify(info)
