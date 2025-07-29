@@ -66,6 +66,8 @@ class PlantasManager:
         try:
             with open(self.archivo_datos, 'r') as file:
                 data = json.load(file)
+                if not isinstance(data, dict):
+                    data = {}
                 self.plantas_por_era = {}
                 for era_name, plantas_data in data.get('plantas_por_era', {}).items():
                     plantas = []
@@ -107,7 +109,7 @@ class PlantasManager:
                                 actividad.planta_asociada = planta
                         plantas.append(planta)
                     self.plantas_por_era[era_name] = plantas
-        except FileNotFoundError:
+        except (FileNotFoundError, json.JSONDecodeError):
             self.plantas_por_era = {}
 
     # Método para guardar datos en el archivo JSON

@@ -13,8 +13,13 @@ class RobotTasksManager:
         try:
             with open(self.tasks_file, 'r') as f:
                 data = json.load(f)
-                self.tareas = data.get('tareas', [])
-        except FileNotFoundError:
+                if isinstance(data, dict):
+                    self.tareas = data.get('tareas', [])
+                elif isinstance(data, list):
+                    self.tareas = data
+                else:
+                    self.tareas = []
+        except (FileNotFoundError, json.JSONDecodeError):
             self.tareas = []
 
     def _save(self) -> None:
