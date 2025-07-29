@@ -15,8 +15,8 @@ class BasicEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, port='COM6', baudrate=115200,
-                 archivo_json='plantas.json',
-                 archivo_tareas='tareas_robot.json',
+                 archivo_json='data/plants.json',
+                 archivo_tareas='data/tasks.json',
                  mode='serial', render=True):
         super(BasicEnv, self).__init__()
 
