@@ -21,12 +21,28 @@ PLANTS_FILE = DATA_DIR / 'plants.json'
 TASKS_FILE = DATA_DIR / 'tasks.json'
 
 def _load_json(path, default):
+    """Load JSON data, tolerating simple wrapper structures."""
     try:
         with open(path, 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return default
-    except json.JSONDecodeError:
+            data = json.load(f)
+
+            # If the file uses a dictionary wrapper, return the nested list.
+            if isinstance(data, dict):
+                # Common wrappers used in this repo
+                for key in ('plants', 'regs', 'tareas', 'items'):
+                    if key in data and isinstance(data[key], list):
+                        return data[key]
+
+                # Flatten "plantas_por_era" format into a simple list
+                if 'plantas_por_era' in data:
+                    combined = []
+                    for era_items in data['plantas_por_era'].values():
+                        if isinstance(era_items, list):
+                            combined.extend(era_items)
+                    return combined
+
+            return data
+    except (FileNotFoundError, json.JSONDecodeError):
         return default
 
 def _save_json(path, data):
@@ -548,6 +564,21 @@ def _get_items(path):
     return _load_json(path, [])
 
 def _save_items(path, items):
+    existing = _load_json(path, None)
+    if isinstance(existing, dict):
+        if 'plantas_por_era' in existing:
+            existing['plantas_por_era'] = {'default': items}
+            _save_json(path, existing)
+            return
+        if 'tareas' in existing:
+            existing['tareas'] = items
+            _save_json(path, existing)
+            return
+        if 'regs' in existing:
+            existing['regs'] = items
+            _save_json(path, existing)
+            return
+
     _save_json(path, items)
 
 @app.route('/api/regs', methods=['GET', 'POST'])
