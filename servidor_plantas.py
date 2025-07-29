@@ -585,8 +585,18 @@ def _save_items(path, items):
 def api_regs():
     regs = _get_items(REGS_FILE)
     if request.method == 'POST':
+        # Allow creating a new regimen without specifying an ID.
+        id_val = request.form.get('id')
+        if id_val is None or id_val == "":
+            next_id = max((r.get('id', 0) for r in regs), default=0) + 1
+        else:
+            try:
+                next_id = int(id_val)
+            except ValueError:
+                next_id = 0
+
         reg = {
-            'id': int(request.form.get('id', 0)),
+            'id': next_id,
             'n': request.form.get('n', ''),
             'd': request.form.get('d', '')
         }
@@ -606,8 +616,17 @@ def api_regs():
 def api_plants():
     plants = _get_items(PLANTS_FILE)
     if request.method == 'POST':
+        id_val = request.form.get('id')
+        if id_val is None or id_val == "":
+            next_id = max((p.get('id', 0) for p in plants), default=0) + 1
+        else:
+            try:
+                next_id = int(id_val)
+            except ValueError:
+                next_id = 0
+
         plant = {
-            'id': int(request.form.get('id', 0)),
+            'id': next_id,
             'reg': request.form.get('reg'),
             'n': request.form.get('n'),
             'd': request.form.get('d'),
@@ -634,8 +653,17 @@ def api_plants():
 def api_tasks():
     tasks = _get_items(TASKS_FILE)
     if request.method == 'POST':
+        id_val = request.form.get('id')
+        if id_val is None or id_val == "":
+            next_id = max((t.get('id', 0) for t in tasks), default=0) + 1
+        else:
+            try:
+                next_id = int(id_val)
+            except ValueError:
+                next_id = 0
+
         task = {
-            'id': int(request.form.get('id', 0)),
+            'id': next_id,
             'reg': request.form.get('reg'),
             'n': request.form.get('n'),
             'off': request.form.get('off'),
