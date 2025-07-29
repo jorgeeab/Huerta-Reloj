@@ -722,8 +722,15 @@ def status():
     """Devuelve un resumen del estado actual del entorno."""
     obs = servidor.env.get_observation()
     if obs is None:
-        return jsonify({'error': 'No hay observación disponible'}), 500
-    obs_list = obs.tolist()
+        # Intentar generar una observación realizando un paso
+        try:
+            servidor.env.step()
+            obs = servidor.env.get_observation()
+        except Exception:
+            obs = None
+    if obs is None:
+        obs = [0.0] * len(servidor.env.variable_names)
+    obs_list = obs if isinstance(obs, list) else obs.tolist()
     obs_dict = dict(zip(servidor.env.variable_names, obs_list))
 
     data = {
