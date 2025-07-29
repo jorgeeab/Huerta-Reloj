@@ -26,7 +26,7 @@ stored in a shared file while every robot keeps its own list of pending tasks.
 ```python
 from basic_gym_env.basic_env import BasicEnv
 
-env = BasicEnv(archivo_json='plantas.json', archivo_tareas='tareas_robot.json')
+env = BasicEnv(archivo_json='data/plants.json', archivo_tareas='data/tasks.json')
 ```
 
 This setup lets multiple robots work in the same environment with the same
@@ -47,6 +47,18 @@ virtual_env = BasicEnv(mode='virtual')
 ```
 
 Both modes share the same API so your control code works without changes.
+
+## Web Interface
+
+A Flask server provides a browser-based interface for manual control and
+managing plants, regimens and tasks. Start the server with:
+
+```bash
+python servidor_plantas.py
+```
+
+The old Tkinter GUIs have been removed. All configuration is now stored in the
+`data/` directory as JSON files and can be edited through the web panel.
 
 ## Assistant Instructions
 
