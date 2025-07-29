@@ -51,10 +51,14 @@ def _save_json(path, data):
 
 class ServidorFlask:
     def __init__(self):
+        # Inicializamos la lista de logs antes de crear el entorno ya que este
+        # podría llamar al logger durante su construcción.  Si ``self.logs`` no
+        # existiera en ese momento se produciría un ``AttributeError``.
+        self.logs = []
+
         # Inicializamos el entorno y el gestor de plantas
         self.env = BasicEnv(port='COM5', baudrate=115200, logger=self.log)
         self.manager = PlantasManager()
-        self.logs = []
 
     def log(self, message):
         timestamp = datetime.now().strftime("%H:%M:%S")
