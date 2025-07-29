@@ -5,6 +5,4 @@ pybullet
 pygame
 simple-pid
 Flask
-pandas
 matplotlib
-openpyxl

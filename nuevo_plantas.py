@@ -56,7 +56,7 @@ class Actividad:
 
 # Clase PlantasManager
 class PlantasManager:
-    def __init__(self, archivo_datos='plantas.json'):
+    def __init__(self, archivo_datos='data/plants.json'):
         self.archivo_datos = archivo_datos
         self.plantas_por_era = {}
         self.cargar_datos()

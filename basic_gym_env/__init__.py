@@ -1,7 +1,6 @@
 from .basic_env import BasicEnv
 from nuevo_plantas import PlantasManager
 from .tasks_manager import RobotTasksManager
-from .interfaz import Interfaz
 
 
 def register_env():
