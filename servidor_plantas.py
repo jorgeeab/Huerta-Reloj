@@ -52,7 +52,7 @@ def _save_json(path, data):
 class ServidorFlask:
     def __init__(self):
         # Inicializamos el entorno y el gestor de plantas
-        self.env = BasicEnv(port='COM5', baudrate=115200)
+        self.env = BasicEnv(port='COM5', baudrate=115200, logger=self.log)
         self.manager = PlantasManager()
         self.logs = []
 
@@ -445,16 +445,20 @@ def simulate_key():
 def update_port():
     new_port = request.form.get('serial_port')
     if new_port:
+        servidor.log(f"Solicitud para cambiar a puerto {new_port}")
         with env_lock:
             servidor.env.change_port(new_port)
+        servidor.log(f"Puerto actual: {servidor.env.port}")
     return redirect(url_for('robot_control'))
 
 @app.route('/toggle_connection', methods=['POST'])
 def toggle_connection():
     with env_lock:
         if servidor.env.ser is None or not servidor.env.ser.is_open:
+            servidor.log("Intentando conectar al puerto serial")
             servidor.env.connect_serial()
         else:
+            servidor.log("Desconectando del puerto serial")
             servidor.env.disconnect_serial()
     return redirect(url_for('robot_control'))
 

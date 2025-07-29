@@ -17,11 +17,12 @@ class BasicEnv(gym.Env):
     def __init__(self, port='COM6', baudrate=115200,
                  archivo_json='data/plants.json',
                  archivo_tareas='data/tasks.json',
-                 mode='serial', render=True):
+                 mode='serial', render=True, logger=None):
         super(BasicEnv, self).__init__()
 
         self.mode = mode
         self.render = render
+        self.logger = logger if logger is not None else print
 
         # Gestores de datos basados en JSON
         self.plantas_manager = PlantasManager(archivo_json)
@@ -182,14 +183,15 @@ class BasicEnv(gym.Env):
         self.last_serial_attempt = now
 
         try:
+            self.logger(f"Intentando conectar al puerto serial {self.port}")
             self.ser = serial.Serial(self.port, self.baudrate, timeout=0.3)
             time.sleep(2)
-            print("Conectado al puerto serial", self.port)
+            self.logger(f"Conectado al puerto serial {self.port}")
             self.serial_error_logged = False
             return True
         except serial.SerialException as e:
             if not self.serial_error_logged:
-                print(f"Error al conectar al puerto serial: {e}")
+                self.logger(f"Error al conectar al puerto serial: {e}")
                 self.serial_error_logged = True
             self.ser = None
             return False
@@ -198,11 +200,12 @@ class BasicEnv(gym.Env):
         """Cerrar la conexión serial actual si está abierta."""
         if self.ser is not None and self.ser.is_open:
             self.ser.close()
-            print("Desconectado del puerto serial")
+            self.logger("Desconectado del puerto serial")
         self.serial_error_logged = False
 
     def change_port(self, new_port):
         """Cambiar de puerto y reconectar."""
+        self.logger(f"Cambiando puerto serial a {new_port}")
         self.port = new_port
         if self.mode == 'serial':
             self.disconnect_serial()
@@ -230,17 +233,17 @@ class BasicEnv(gym.Env):
                         buffer = buffer[end + 1:]
                         self.process_serial_line(line)
             except serial.SerialException as e:
-                print(f"Serial read error: {e}")
+                self.logger(f"Serial read error: {e}")
                 self.ser = None
             except Exception as e:
-                print(f"Unexpected error: {e}")
+                self.logger(f"Unexpected error: {e}")
 
     def process_serial_line(self, line):
         # Dividir la línea por comas
         values = line.strip().split(',')
 
         if len(values) not in (21, 24):
-            print(f"Error: expected 21 or 24 values, got {len(values)}")
+            self.logger(f"Error: expected 21 or 24 values, got {len(values)}")
             return
 
         # Valores por defecto para el formato reducido
