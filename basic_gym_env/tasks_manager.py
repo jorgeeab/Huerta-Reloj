@@ -4,7 +4,7 @@ from typing import List, Dict, Any
 class RobotTasksManager:
     """Manage per-robot task lists stored in a JSON file."""
 
-    def __init__(self, tasks_file: str = 'tareas_robot.json') -> None:
+    def __init__(self, tasks_file: str = 'data/tasks.json') -> None:
         self.tasks_file = tasks_file
         self.tareas: List[Dict[str, Any]] = []
         self._load()
