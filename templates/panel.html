@@ -185,6 +185,7 @@ K K D --
       <h6 class="card-title text-center mb-2">
         <span id="s1-name">Corredera</span>
         <span class="badge badge-light" id="s1-val">--°</span>
+        <span class="badge badge-info" id="s1-real">--°</span>
       </h6>
       <div id="s1-slider"></div>
       <div id="pid-s1" class="card mt-2" style="display:none;">
@@ -195,9 +196,18 @@ K K D --
           <div class="card-body p-2">
             <p class="small mb-1">PID Ángulo</p>
             <div class="form-row">
-              <div class="col"><input id="pida-kp" class="form-control form-control-sm" type="number" step="0.1" placeholder="Kp"></div>
-              <div class="col"><input id="pida-ki" class="form-control form-control-sm" type="number" step="0.1" placeholder="Ki"></div>
-              <div class="col"><input id="pida-kd" class="form-control form-control-sm" type="number" step="0.1" placeholder="Kd"></div>
+              <div class="col">
+                <input id="pida-kp" class="form-control form-control-sm" type="number" step="0.1" placeholder="Kp">
+                <small class="text-muted">Act: <span id="pida-kp-cur">0</span></small>
+              </div>
+              <div class="col">
+                <input id="pida-ki" class="form-control form-control-sm" type="number" step="0.1" placeholder="Ki">
+                <small class="text-muted">Act: <span id="pida-ki-cur">0</span></small>
+              </div>
+              <div class="col">
+                <input id="pida-kd" class="form-control form-control-sm" type="number" step="0.1" placeholder="Kd">
+                <small class="text-muted">Act: <span id="pida-kd-cur">0</span></small>
+              </div>
             </div>
             <button id="pid-s1-send" class="btn btn-success btn-sm btn-block mt-1">Guardar PID</button>
           </div>
@@ -220,6 +230,7 @@ K K D --
       <h6 class="card-title text-center mb-2">
         <span id="s2-name">Ángulo</span>
         <span class="badge badge-light" id="s2-val">--°</span>
+        <span class="badge badge-info" id="s2-real">--°</span>
       </h6>
       <div id="s2-slider"></div>
       <div id="pid-s2" class="card mt-2" style="display:none;">
@@ -230,9 +241,18 @@ K K D --
           <div class="card-body p-2">
             <p class="small mb-1">PID Corredera</p>
             <div class="form-row">
-              <div class="col"><input id="pidc-kp" class="form-control form-control-sm" type="number" step="0.1" placeholder="Kp"></div>
-              <div class="col"><input id="pidc-ki" class="form-control form-control-sm" type="number" step="0.1" placeholder="Ki"></div>
-              <div class="col"><input id="pidc-kd" class="form-control form-control-sm" type="number" step="0.1" placeholder="Kd"></div>
+              <div class="col">
+                <input id="pidc-kp" class="form-control form-control-sm" type="number" step="0.1" placeholder="Kp">
+                <small class="text-muted">Act: <span id="pidc-kp-cur">0</span></small>
+              </div>
+              <div class="col">
+                <input id="pidc-ki" class="form-control form-control-sm" type="number" step="0.1" placeholder="Ki">
+                <small class="text-muted">Act: <span id="pidc-ki-cur">0</span></small>
+              </div>
+              <div class="col">
+                <input id="pidc-kd" class="form-control form-control-sm" type="number" step="0.1" placeholder="Kd">
+                <small class="text-muted">Act: <span id="pidc-kd-cur">0</span></small>
+              </div>
             </div>
             <button id="pid-s2-send" class="btn btn-success btn-sm btn-block mt-1">Guardar PID</button>
           </div>
@@ -256,18 +276,26 @@ K K D --
 
       <div class="row text-center align-items-start">
         <div class="col-6 col-md-4 mb-3">
-          <h6>Servo válvula <span class="badge badge-light" id="servo-val">--°</span></h6>
+          <h6>Servo válvula
+            <span class="badge badge-light" id="servo-val">--°</span>
+            <span class="badge badge-info" id="servo-real">--°</span>
+          </h6>
           <div id="servo-slider"></div>
         </div>
         <div class="col-6 col-md-4 mb-3">
-          <h6>Flujo deseado <span class="badge badge-light" id="flow-val">-- ml/s</span></h6>
+          <h6>Flujo deseado
+            <span class="badge badge-light" id="flow-val">-- ml/s</span>
+            <span class="badge badge-info" id="flow-real">-- ml/s</span>
+          </h6>
           <div id="flow-slider"></div>
         </div>
         <div class="col-12 col-md-4 mb-3">
           <div class="d-flex justify-content-center mb-2 flex-wrap">
             <div class="custom-control custom-switch mx-2">
               <input id="pid-swch" type="checkbox" class="custom-control-input">
-              <label class="custom-control-label" for="pid-swch">PID</label>
+              <label class="custom-control-label" for="pid-swch">PID
+                <span id="pid-active" class="badge badge-secondary ml-1">OFF</span>
+              </label>
             </div>
               <div class="custom-control custom-switch mx-2" id="ff-switch-wrap">
                 <input id="ff-swch" type="checkbox" class="custom-control-input" checked>
@@ -279,9 +307,18 @@ K K D --
 
           <div id="pidControls" style="display:none;" class="mb-2">
             <div id="pid-valvula" class="form-row">
-              <div class="col"><input id="pid-kp" class="form-control form-control-sm" type="number" step="0.1" placeholder="Kp"></div>
-              <div class="col"><input id="pid-ki" class="form-control form-control-sm" type="number" step="0.1" placeholder="Ki"></div>
-              <div class="col"><input id="pid-kd" class="form-control form-control-sm" type="number" step="0.1" placeholder="Kd"></div>
+              <div class="col">
+                <input id="pid-kp" class="form-control form-control-sm" type="number" step="0.1" placeholder="Kp">
+                <small class="text-muted">Act: <span id="pid-kp-cur">0</span></small>
+              </div>
+              <div class="col">
+                <input id="pid-ki" class="form-control form-control-sm" type="number" step="0.1" placeholder="Ki">
+                <small class="text-muted">Act: <span id="pid-ki-cur">0</span></small>
+              </div>
+              <div class="col">
+                <input id="pid-kd" class="form-control form-control-sm" type="number" step="0.1" placeholder="Kd">
+                <small class="text-muted">Act: <span id="pid-kd-cur">0</span></small>
+              </div>
             </div>
             <button id="pid-valve-send" class="btn btn-success btn-sm btn-block mt-1">Guardar PID</button>
             <button id="pid-cal" class="btn btn-info btn-sm btn-block mt-1">Calibrar PID</button>

@@ -172,11 +172,34 @@ window.addEventListener('DOMContentLoaded', () => {
   mk('#flow-slider',0,30,0.1,0,'#flow-val',
      v=>api(`/control?flow=${v}`));
 
+  /* mostrar gráficas al abrir config PID */
+  const pidS1Col = $('#pidS1Collapse');
+  const pidS2Col = $('#pidS2Collapse');
+  pidS1Col.on('shown.bs.collapse',()=>{
+    $('#s1-chart-card').show();
+    $('#s1ChartCollapse').collapse('show');
+  }).on('hidden.bs.collapse',()=>{
+    $('#s1-chart-card').hide();
+    $('#s1ChartCollapse').collapse('hide');
+  });
+  pidS2Col.on('shown.bs.collapse',()=>{
+    $('#s2-chart-card').show();
+    $('#s2ChartCollapse').collapse('show');
+  }).on('hidden.bs.collapse',()=>{
+    $('#s2-chart-card').hide();
+    $('#s2ChartCollapse').collapse('hide');
+  });
+
   /* ===== Switches PID / FF =================================== */
   const pidSw=qs('#pid-swch'), ffSw=qs('#ff-swch');
   const pidCtrls=qs('#pidControls'), ffEq=qs('#ffEqInline');
+  const pidBadge=qs('#pid-active');
   const togglePid=()=>{
     pidCtrls.style.display=pidSw.checked?'':'none';
+    if(pidBadge){
+      pidBadge.textContent=pidSw.checked?'ON':'OFF';
+      pidBadge.className=`badge badge-${pidSw.checked?'success':'secondary'} ml-1`;
+    }
     if(pidEditable)
       api(`/control?pid=${pidSw.checked?1:0}`);
   };
@@ -322,6 +345,12 @@ window.addEventListener('DOMContentLoaded', () => {
     try{
       const st = await api('/status');
       lastStatus = st;
+      pidSw.checked = !!st.pidOn;
+      if(pidBadge){
+        pidBadge.textContent = st.pidOn ? 'ON':'OFF';
+        pidBadge.className = `badge badge-${st.pidOn?'success':'secondary'} ml-1`;
+      }
+      pidCtrls.style.display = pidSw.checked ? '' : 'none';
       const lines = [
         `Flow ${( +st.flow ).toFixed(1)} ml/s — SP ${( +st.setpoint ).toFixed(1)}`,
         `Ángulo ${ st.servo ?? '--'}°`
@@ -338,10 +367,26 @@ window.addEventListener('DOMContentLoaded', () => {
         qs('#pidc-kp').value = (+st.KpC).toFixed(2);
         qs('#pidc-ki').value = (+st.KiC).toFixed(2);
         qs('#pidc-kd').value = (+st.KdC).toFixed(2);
+        qs('#pidc-kp-cur').textContent = (+st.KpC).toFixed(2);
+        qs('#pidc-ki-cur').textContent = (+st.KiC).toFixed(2);
+        qs('#pidc-kd-cur').textContent = (+st.KdC).toFixed(2);
+
         qs('#pida-kp').value = (+st.KpA).toFixed(2);
         qs('#pida-ki').value = (+st.KiA).toFixed(2);
         qs('#pida-kd').value = (+st.KdA).toFixed(2);
+        qs('#pida-kp-cur').textContent = (+st.KpA).toFixed(2);
+        qs('#pida-ki-cur').textContent = (+st.KiA).toFixed(2);
+        qs('#pida-kd-cur').textContent = (+st.KdA).toFixed(2);
       }
+
+      qs('#pid-kp-cur').textContent  = (+st.Kp).toFixed(1);
+      qs('#pid-ki-cur').textContent  = (+st.Ki).toFixed(1);
+      qs('#pid-kd-cur').textContent  = (+st.Kd).toFixed(1);
+
+      qs('#servo-real').textContent = `${(+st.servo).toFixed(0)}°`;
+      qs('#s1-real').textContent    = `${(+st.s1).toFixed(0)}°`;
+      qs('#s2-real').textContent    = `${(+st.s2).toFixed(0)}°`;
+      qs('#flow-real').textContent  = `${(+st.flow).toFixed(1)} ml/s`;
 
       autoExec=!!st.autoExecEnabled;
       ui.badge.textContent=autoExec?'⏳ En ejecución automática':'✔ Sistema en espera';
