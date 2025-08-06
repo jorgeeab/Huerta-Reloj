@@ -30,6 +30,14 @@ window.addEventListener('DOMContentLoaded', () => {
         });
   };
 
+  // Helper para peticiones POST con JSON
+  const apiJson = (url, data={}) =>
+    fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(data)
+    }).then(r=>{ if(!r.ok) throw new Error(`${url} → ${r.status}`); return r.json(); });
+
   /* ===== Referencias UI ====================================== */
   const ui = {
     status : qs('#status'),
@@ -44,12 +52,15 @@ window.addEventListener('DOMContentLoaded', () => {
     motors : qs('#robot-motors'),
     cam    : qs('#cameraFeed'),
     ffCard : qs('#ff-card'),
-    ffWrap : qs('#ff-switch-wrap')
+    ffWrap : qs('#ff-switch-wrap'),
+    manualBtn: qs('#manual-toggle'),
+    manualBadge: qs('#manual-badge'),
+    manualSliders: qs('#manual-sliders')
   };
   let autoExec=false, regs=[], plants=[], tasks=[], currentRegId=null,
       tick=0, editingTask=null, currentRobot=0,
       lastStatus=null, pidEditable=true, isBasicEnv=false,
-      s1Target=90, s2Target=90;
+      s1Target=90, s2Target=90, manualMode=false;
 
   const reloadCamera = () => {
     if(ui.cam) ui.cam.src = `/video_feed?ts=${Date.now()}`;
@@ -172,6 +183,20 @@ window.addEventListener('DOMContentLoaded', () => {
   mk('#flow-slider',0,30,0.1,0,'#flow-val',
      v=>api(`/control?flow=${v}`));
 
+  const mkEnergy = (sel,out,comp)=>{
+    const el = qs(sel); if(!el) return;
+    noUiSlider.create(el,{start:0,step:1,range:{min:-255,max:255}});
+    el.noUiSlider.on('update',(_,__,v)=> qs(out).textContent=Math.round(v));
+    el.noUiSlider.on('change',(_,__,v)=>{
+      const d={manual_mode:1,motor_energies:{}};
+      d.motor_energies[comp]=Math.round(v);
+      apiJson('/entorno/actualizar_acciones',d).catch(console.warn);
+    });
+  };
+  mkEnergy('#energy-corredera-slider','#energy-corredera-val','corredera');
+  mkEnergy('#energy-angulo-slider','#energy-angulo-val','angulo');
+  mkEnergy('#energy-valvula-slider','#energy-valvula-val','valvula');
+
   /* mostrar gráficas al abrir config PID */
   const pidS1Col = $('#pidS1Collapse');
   const pidS2Col = $('#pidS2Collapse');
@@ -261,6 +286,12 @@ window.addEventListener('DOMContentLoaded', () => {
   ui.btn.onclick=()=>api(`/control?ejec=${autoExec?0:1}`)
                     .then(refreshStatus).catch(alert);
 
+  ui.manualBtn?.addEventListener('click',()=>{
+    const next = manualMode ? 0 : 1;
+    apiJson('/entorno/actualizar_acciones',{manual_mode:next})
+      .then(refreshStatus).catch(e=>alert(e.message));
+  });
+
   /* ===== Gráfica Flujo vs SP ================================ */
   const ctxFlow=qs('#chart').getContext('2d');
   const flowData={labels:[],datasets:[
@@ -345,6 +376,16 @@ window.addEventListener('DOMContentLoaded', () => {
     try{
       const st = await api('/status');
       lastStatus = st;
+      manualMode = !!st.manualMode;
+      if(ui.manualBadge){
+        ui.manualBadge.textContent = manualMode ? 'ON':'OFF';
+      }
+      if(ui.manualBtn){
+        ui.manualBtn.textContent = manualMode ? 'Desactivar modo manual':'Activar modo manual';
+      }
+      if(ui.manualSliders){
+        ui.manualSliders.style.display = manualMode ? '' : 'none';
+      }
       pidSw.checked = !!st.pidOn;
       if(pidBadge){
         pidBadge.textContent = st.pidOn ? 'ON':'OFF';
