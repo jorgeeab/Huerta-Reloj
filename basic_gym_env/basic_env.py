@@ -239,6 +239,9 @@ class BasicEnv(gym.Env):
                 self.logger(f"Unexpected error: {e}")
 
     def process_serial_line(self, line):
+        # Registrar la línea cruda recibida del Arduino
+        self.logger(f"Arduino: {line}")
+
         # Dividir la línea por comas
         values = line.strip().split(',')
 
