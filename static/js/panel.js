@@ -40,7 +40,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
   /* ===== Referencias UI ====================================== */
   const ui = {
-    status : qs('#status'),
     logs   : qs('#logs'),
     badge  : qs('#execBadge'),
     btn    : qs('#execBtn'),
@@ -54,9 +53,11 @@ window.addEventListener('DOMContentLoaded', () => {
     ffCard : qs('#ff-card'),
     ffWrap : qs('#ff-switch-wrap'),
     manualBtn: qs('#manual-toggle'),
-    manualBadge: qs('#manual-badge'),
-    manualSliders: qs('#manual-sliders')
+    manualBadge: qs('#manual-badge')
   };
+  const energyWraps = qsa('.energy-wrap');
+  // show energy controls by default; disabled state is managed later
+  energyWraps.forEach(w=>w.style.display='');
   let autoExec=false, regs=[], plants=[], tasks=[], currentRegId=null,
       tick=0, editingTask=null, currentRobot=0,
       lastStatus=null, pidEditable=true, isBasicEnv=false,
@@ -383,26 +384,22 @@ window.addEventListener('DOMContentLoaded', () => {
       if(ui.manualBtn){
         ui.manualBtn.textContent = manualMode ? 'Desactivar modo manual':'Activar modo manual';
       }
-      if(ui.manualSliders){
-        ui.manualSliders.style.display = manualMode ? '' : 'none';
-      }
+      // ensure energy controls stay visible but toggle interactivity via disabled state
+      energyWraps.forEach(w=>w.style.display='');
+      const setDisabled = (sel,dis)=>{
+        const el = qs(sel); if(!el || !el.noUiSlider) return;
+        if(dis){ el.setAttribute('disabled',true); }
+        else { el.removeAttribute('disabled'); }
+      };
+      ['#s1-slider','#s2-slider','#servo-slider','#flow-slider'].forEach(sel=>setDisabled(sel,manualMode));
+      ['#energy-corredera-slider','#energy-angulo-slider','#energy-valvula-slider']
+        .forEach(sel=>setDisabled(sel,!manualMode));
       pidSw.checked = !!st.pidOn;
       if(pidBadge){
         pidBadge.textContent = st.pidOn ? 'ON':'OFF';
         pidBadge.className = `badge badge-${st.pidOn?'success':'secondary'} ml-1`;
       }
       pidCtrls.style.display = pidSw.checked ? '' : 'none';
-      const lines = [
-        `Flow ${( +st.flow ).toFixed(1)} ml/s — SP ${( +st.setpoint ).toFixed(1)}`,
-        `Ángulo ${ st.servo ?? '--'}°`
-      ];
-      if(pidEditable && 'Kp' in st){
-        lines.push(`PID ${ st.pidOn ? 'ON':'OFF'}, FF ${ st.ffOn ? 'ON':'OFF'}`);
-        lines.push(`K K D ${( +st.Kp ).toFixed(1)} ${( +st.Ki ).toFixed(1)} ${( +st.Kd ).toFixed(1)}`);
-      }else{
-        lines.push('PID N/A');
-      }
-      ui.status.textContent = lines.join('\n');
 
       if(isBasicEnv){
         qs('#pidc-kp-cur').textContent = (+st.KpC).toFixed(2);
@@ -422,6 +419,27 @@ window.addEventListener('DOMContentLoaded', () => {
       qs('#s1-real').textContent    = `${(+st.s1).toFixed(0)}°`;
       qs('#s2-real').textContent    = `${(+st.s2).toFixed(0)}°`;
       qs('#flow-real').textContent  = `${(+st.flow).toFixed(1)} ml/s`;
+
+      // sync sliders with real readings so UI and charts share the same source
+      qs('#s1-slider')?.noUiSlider?.set(+st.s1);
+      qs('#s2-slider')?.noUiSlider?.set(+st.s2);
+      qs('#servo-slider')?.noUiSlider?.set(+st.servo);
+      qs('#flow-slider')?.noUiSlider?.set(+st.setpoint);
+
+      if(manualMode){
+        // manual mode disables energy outputs
+        qs('#energy-corredera-slider')?.noUiSlider?.set(0);
+        qs('#energy-angulo-slider')?.noUiSlider?.set(0);
+        qs('#energy-valvula-slider')?.noUiSlider?.set(0);
+      }else{
+        // reflect controller energy when not in manual mode
+        qs('#energy-corredera-slider')?.noUiSlider?.set(st.energyCorredera ?? 0);
+        qs('#energy-angulo-slider')?.noUiSlider?.set(st.energyAngulo ?? 0);
+        qs('#energy-valvula-slider')?.noUiSlider?.set(st.energyValvula ?? 0);
+        // keep chart targets aligned with current positions
+        s1Target = +st.s1;
+        s2Target = +st.s2;
+      }
 
       autoExec=!!st.autoExecEnabled;
       ui.badge.textContent=autoExec?'⏳ En ejecución automática':'✔ Sistema en espera';
