@@ -10,6 +10,12 @@ This repository contains a custom Gym environment and several Flask servers used
 pip install -r requirements.txt
 ```
 
+OpenCV is included in the requirements file for the camera streaming features. If you need to install it manually, run:
+
+```bash
+pip install opencv-python
+```
+
 2. Install the package in editable mode if you plan to modify the environment:
 
 ```bash
