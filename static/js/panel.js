@@ -188,20 +188,21 @@ window.addEventListener('DOMContentLoaded', () => {
   mk('#flow-slider',0,30,0.1,0,'#flow-val',
      v=>api(`/control?flow=${v}`));
 
-  const mkEnergy = (sel,out,btn,comp)=>{
+  const mkEnergy = (sel,out,comp)=>{
     const el = qs(sel); if(!el) return;
     noUiSlider.create(el,{start:0,step:1,range:{min:-255,max:255}});
     el.noUiSlider.on('update',(_,__,v)=> qs(out).textContent=Math.round(v));
-    qs(btn)?.addEventListener('click',()=>{
+    el.noUiSlider.on('change',()=>{
+      if(!manualState[comp]) return;
       const v = Math.round(el.noUiSlider.get());
       const d={manual_mode:1,motor_energies:{}};
       d.motor_energies[comp]=v;
       apiJson('/entorno/actualizar_acciones',d).catch(console.warn);
     });
   };
-  mkEnergy('#energy-corredera-slider','#energy-corredera-val','#energy-corredera-btn','corredera');
-  mkEnergy('#energy-angulo-slider','#energy-angulo-val','#energy-angulo-btn','angulo');
-  mkEnergy('#energy-valvula-slider','#energy-valvula-val','#energy-valvula-btn','valvula');
+  mkEnergy('#energy-corredera-slider','#energy-corredera-val','corredera');
+  mkEnergy('#energy-angulo-slider','#energy-angulo-val','angulo');
+  mkEnergy('#energy-valvula-slider','#energy-valvula-val','valvula');
 
   /* mostrar gráficas al abrir config PID */
   const pidS1Col = $('#pidS1Collapse');
@@ -405,8 +406,6 @@ window.addEventListener('DOMContentLoaded', () => {
       ['#s1-slider','#s2-slider','#servo-slider','#flow-slider'].forEach(sel=>setDisabled(sel,manualMode));
       Object.entries(manualState).forEach(([comp,active])=>{
         setDisabled(`#energy-${comp}-slider`, !manualMode || !active);
-        const b = qs(`#energy-${comp}-btn`);
-        if(b) b.disabled = !manualMode || !active;
         const btn = manualToggles[comp];
         if(btn) btn.textContent = active ? 'Desactivar modo manual' : 'Activar modo manual';
       });
@@ -436,9 +435,14 @@ window.addEventListener('DOMContentLoaded', () => {
       qs('#s2-real').textContent    = `${(+st.s2).toFixed(0)}°`;
       qs('#flow-real').textContent  = `${(+st.flow).toFixed(1)} ml/s`;
 
-      // sync sliders with real readings so UI and charts share the same source
-      qs('#s1-slider')?.noUiSlider?.set(+st.s1);
-      qs('#s2-slider')?.noUiSlider?.set(+st.s2);
+      // sync sliders with current targets in auto mode or real readings in manual mode
+      if(manualMode){
+        qs('#s1-slider')?.noUiSlider?.set(+st.s1);
+        qs('#s2-slider')?.noUiSlider?.set(+st.s2);
+      }else{
+        qs('#s1-slider')?.noUiSlider?.set(s1Target);
+        qs('#s2-slider')?.noUiSlider?.set(s2Target);
+      }
       qs('#servo-slider')?.noUiSlider?.set(+st.servo);
       qs('#flow-slider')?.noUiSlider?.set(+st.setpoint);
 
