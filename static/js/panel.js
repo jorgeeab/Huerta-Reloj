@@ -405,16 +405,10 @@ window.addEventListener('DOMContentLoaded', () => {
       ui.status.textContent = lines.join('\n');
 
       if(isBasicEnv){
-        qs('#pidc-kp').value = (+st.KpC).toFixed(2);
-        qs('#pidc-ki').value = (+st.KiC).toFixed(2);
-        qs('#pidc-kd').value = (+st.KdC).toFixed(2);
         qs('#pidc-kp-cur').textContent = (+st.KpC).toFixed(2);
         qs('#pidc-ki-cur').textContent = (+st.KiC).toFixed(2);
         qs('#pidc-kd-cur').textContent = (+st.KdC).toFixed(2);
 
-        qs('#pida-kp').value = (+st.KpA).toFixed(2);
-        qs('#pida-ki').value = (+st.KiA).toFixed(2);
-        qs('#pida-kd').value = (+st.KdA).toFixed(2);
         qs('#pida-kp-cur').textContent = (+st.KpA).toFixed(2);
         qs('#pida-ki-cur').textContent = (+st.KiA).toFixed(2);
         qs('#pida-kd-cur').textContent = (+st.KdA).toFixed(2);
