@@ -180,28 +180,30 @@ window.addEventListener('DOMContentLoaded', () => {
     if(cb) qs(sel).noUiSlider.on('change',(_,__,v)=>cb(+v));
   };
   mk('#servo-slider',50,180,1,170,'#servo-val',
-     v=>api(`/control?servo=${Math.round(v)}`));
+     v=>api(`/control?servo=${Math.round(v)}`).then(refreshStatus));
   mk('#s1-slider',0,180,1,90,'#s1-val',
-     v=>{ s1Target=v; api(`/control?servo=${Math.round(v)}&pin=1`); });
+     v=>{ s1Target=v; api(`/control?servo=${Math.round(v)}&pin=1`).then(refreshStatus); });
   mk('#s2-slider',0,180,1,90,'#s2-val',
-     v=>{ s2Target=v; api(`/control?servo=${Math.round(v)}&pin=2`); });
+     v=>{ s2Target=v; api(`/control?servo=${Math.round(v)}&pin=2`).then(refreshStatus); });
   mk('#flow-slider',0,30,0.1,0,'#flow-val',
-     v=>api(`/control?flow=${v}`));
+     v=>api(`/control?flow=${v}`).then(refreshStatus));
 
-  const mkEnergy = (sel,out,btn,comp)=>{
+  const mkEnergy = (sel,out,comp)=>{
     const el = qs(sel); if(!el) return;
     noUiSlider.create(el,{start:0,step:1,range:{min:-255,max:255}});
     el.noUiSlider.on('update',(_,__,v)=> qs(out).textContent=Math.round(v));
-    qs(btn)?.addEventListener('click',()=>{
-      const v = Math.round(el.noUiSlider.get());
+    el.noUiSlider.on('change',(_,__,v)=>{
+      const val = Math.round(v);
       const d={manual_mode:1,motor_energies:{}};
-      d.motor_energies[comp]=v;
-      apiJson('/entorno/actualizar_acciones',d).catch(console.warn);
+      d.motor_energies[comp]=val;
+      apiJson('/entorno/actualizar_acciones',d)
+        .then(refreshStatus)
+        .catch(console.warn);
     });
   };
-  mkEnergy('#energy-corredera-slider','#energy-corredera-val','#energy-corredera-btn','corredera');
-  mkEnergy('#energy-angulo-slider','#energy-angulo-val','#energy-angulo-btn','angulo');
-  mkEnergy('#energy-valvula-slider','#energy-valvula-val','#energy-valvula-btn','valvula');
+  mkEnergy('#energy-corredera-slider','#energy-corredera-val','corredera');
+  mkEnergy('#energy-angulo-slider','#energy-angulo-val','angulo');
+  mkEnergy('#energy-valvula-slider','#energy-valvula-val','valvula');
 
   /* mostrar gráficas al abrir config PID */
   const pidS1Col = $('#pidS1Collapse');
@@ -405,8 +407,6 @@ window.addEventListener('DOMContentLoaded', () => {
       ['#s1-slider','#s2-slider','#servo-slider','#flow-slider'].forEach(sel=>setDisabled(sel,manualMode));
       Object.entries(manualState).forEach(([comp,active])=>{
         setDisabled(`#energy-${comp}-slider`, !manualMode || !active);
-        const b = qs(`#energy-${comp}-btn`);
-        if(b) b.disabled = !manualMode || !active;
         const btn = manualToggles[comp];
         if(btn) btn.textContent = active ? 'Desactivar modo manual' : 'Activar modo manual';
       });
