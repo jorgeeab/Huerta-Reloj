@@ -391,26 +391,45 @@ window.addEventListener('DOMContentLoaded', () => {
       lastStatus = st;
       manualMode = !!st.manualMode;
       if(!manualMode){
-        Object.keys(manualState).forEach(comp=>{
-          manualState[comp]=false;
-          const btn = manualToggles[comp];
-          if(btn) btn.textContent='Activar modo manual';
-        });
-      }
-      // ensure energy controls stay visible but toggle interactivity via disabled state
-      energyWraps.forEach(w=>w.style.display='');
-      const setDisabled = (sel,dis)=>{
-        const el = qs(sel); if(!el || !el.noUiSlider) return;
-        if(dis){ el.setAttribute('disabled',true); }
-        else { el.removeAttribute('disabled'); }
-      };
-      ['#s1-slider','#s2-slider','#servo-slider','#flow-slider'].forEach(sel=>setDisabled(sel,manualMode));
-      Object.entries(manualState).forEach(([comp,active])=>{
-        setDisabled(`#energy-${comp}-slider`, !manualMode || !active);
+      Object.keys(manualState).forEach(comp=>{
+        manualState[comp]=false;
         const btn = manualToggles[comp];
-        if(btn) btn.textContent = active ? 'Desactivar modo manual' : 'Activar modo manual';
+        if(btn){
+          btn.textContent='Activar modo manual';
+          btn.className='btn btn-sm btn-secondary manual-toggle mb-2';
+        }
       });
-      pidSw.checked = !!st.pidOn;
+    }
+    // ensure energy controls stay visible but toggle interactivity via disabled state
+    energyWraps.forEach(w=>w.style.display='');
+    const setDisabled = (sel,dis)=>{
+      const el = qs(sel); if(!el || !el.noUiSlider) return;
+      if(dis){ el.setAttribute('disabled',true); }
+      else { el.removeAttribute('disabled'); }
+    };
+    ['#s1-slider','#s2-slider','#servo-slider','#flow-slider'].forEach(sel=>{
+      setDisabled(sel,manualMode);
+      qs(sel)?.classList.toggle('disabled-setup',manualMode);
+    });
+    Object.entries(manualState).forEach(([comp,active])=>{
+      const energySel = `#energy-${comp}-slider`;
+      const enabled = manualMode && active;
+      setDisabled(energySel, !enabled);
+      qs(energySel)?.classList.toggle('active-energy', enabled);
+      const btn = manualToggles[comp];
+      if(btn){
+        btn.textContent = active ? 'Desactivar modo manual' : 'Activar modo manual';
+        btn.className = `btn btn-sm btn-${active?'primary':'secondary'} manual-toggle mb-2`;
+      }
+      const energyBadge = qs(`#energy-${comp}-val`);
+      if(energyBadge)
+        energyBadge.className = `badge badge-${enabled?'info':'secondary'}`;
+    });
+    ['#s1-val','#s2-val','#servo-val'].forEach(sel=>{
+      const b = qs(sel);
+      if(b) b.className = `badge badge-${manualMode?'secondary':'light'}`;
+    });
+    pidSw.checked = !!st.pidOn;
       if(pidBadge){
         pidBadge.textContent = st.pidOn ? 'ON':'OFF';
         pidBadge.className = `badge badge-${st.pidOn?'success':'secondary'} ml-1`;
@@ -442,14 +461,14 @@ window.addEventListener('DOMContentLoaded', () => {
       qs('#servo-slider')?.noUiSlider?.set(+st.servo);
       qs('#flow-slider')?.noUiSlider?.set(+st.setpoint);
 
-      if(!manualMode){
-        qs('#energy-corredera-slider')?.noUiSlider?.set(st.energyCorredera ?? 0);
-        qs('#energy-angulo-slider')?.noUiSlider?.set(st.energyAngulo ?? 0);
-        qs('#energy-valvula-slider')?.noUiSlider?.set(st.energyValvula ?? 0);
+       qs('#energy-corredera-slider')?.noUiSlider?.set(st.energyCorredera ?? 0);
+       qs('#energy-angulo-slider')?.noUiSlider?.set(st.energyAngulo ?? 0);
+       qs('#energy-valvula-slider')?.noUiSlider?.set(st.energyValvula ?? 0);
+       if(!manualMode){
         // keep chart targets aligned with current positions
         s1Target = +st.s1;
         s2Target = +st.s2;
-      }
+       }
 
       autoExec=!!st.autoExecEnabled;
       ui.badge.textContent=autoExec?'⏳ En ejecución automática':'✔ Sistema en espera';
