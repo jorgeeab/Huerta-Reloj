@@ -6,3 +6,4 @@ pygame
 simple-pid
 Flask
 matplotlib
+opencv-python
