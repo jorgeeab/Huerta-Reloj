@@ -51,9 +51,7 @@ window.addEventListener('DOMContentLoaded', () => {
     motors : qs('#robot-motors'),
     cam    : qs('#cameraFeed'),
     ffCard : qs('#ff-card'),
-    ffWrap : qs('#ff-switch-wrap'),
-    manualBtn: qs('#manual-toggle'),
-    manualBadge: qs('#manual-badge')
+    ffWrap : qs('#ff-switch-wrap')
   };
   const energyWraps = qsa('.energy-wrap');
   // show energy controls by default; disabled state is managed later
@@ -61,7 +59,7 @@ window.addEventListener('DOMContentLoaded', () => {
   let autoExec=false, regs=[], plants=[], tasks=[], currentRegId=null,
       tick=0, editingTask=null, currentRobot=0,
       lastStatus=null, pidEditable=true, isBasicEnv=false,
-      s1Target=90, s2Target=90, manualMode=false;
+      s1Target=90, s2Target=90;
 
   const reloadCamera = () => {
     if(ui.cam) ui.cam.src = `/video_feed?ts=${Date.now()}`;
@@ -192,7 +190,12 @@ window.addEventListener('DOMContentLoaded', () => {
       const v = Math.round(el.noUiSlider.get());
       const d={manual_mode:1,motor_energies:{}};
       d.motor_energies[comp]=v;
-      apiJson('/entorno/actualizar_acciones',d).catch(console.warn);
+      apiJson('/entorno/actualizar_acciones',d)
+        .then(()=>apiJson('/entorno/actualizar_acciones',{
+          manual_mode:0,
+          motor_energies:{[comp]:0}
+        }))
+        .catch(console.warn);
     });
   };
   mkEnergy('#energy-corredera-slider','#energy-corredera-val','#energy-corredera-btn','corredera');
@@ -288,12 +291,6 @@ window.addEventListener('DOMContentLoaded', () => {
   ui.btn.onclick=()=>api(`/control?ejec=${autoExec?0:1}`)
                     .then(refreshStatus).catch(alert);
 
-  ui.manualBtn?.addEventListener('click',()=>{
-    const next = manualMode ? 0 : 1;
-    apiJson('/entorno/actualizar_acciones',{manual_mode:next})
-      .then(refreshStatus).catch(e=>alert(e.message));
-  });
-
   /* ===== Gráfica Flujo vs SP ================================ */
   const ctxFlow=qs('#chart').getContext('2d');
   const flowData={labels:[],datasets:[
@@ -378,25 +375,7 @@ window.addEventListener('DOMContentLoaded', () => {
     try{
       const st = await api('/status');
       lastStatus = st;
-      manualMode = !!st.manualMode;
-      if(ui.manualBadge){
-        ui.manualBadge.textContent = manualMode ? 'ON':'OFF';
-      }
-      if(ui.manualBtn){
-        ui.manualBtn.textContent = manualMode ? 'Desactivar modo manual':'Activar modo manual';
-      }
-      // ensure energy controls stay visible but toggle interactivity via disabled state
       energyWraps.forEach(w=>w.style.display='');
-      const setDisabled = (sel,dis)=>{
-        const el = qs(sel); if(!el || !el.noUiSlider) return;
-        if(dis){ el.setAttribute('disabled',true); }
-        else { el.removeAttribute('disabled'); }
-      };
-      ['#s1-slider','#s2-slider','#servo-slider','#flow-slider'].forEach(sel=>setDisabled(sel,manualMode));
-      ['#energy-corredera-slider','#energy-angulo-slider','#energy-valvula-slider']
-        .forEach(sel=>setDisabled(sel,!manualMode));
-      ['#energy-corredera-btn','#energy-angulo-btn','#energy-valvula-btn']
-        .forEach(sel=>{const b=qs(sel); if(b) b.disabled=!manualMode;});
       pidSw.checked = !!st.pidOn;
       if(pidBadge){
         pidBadge.textContent = st.pidOn ? 'ON':'OFF';
@@ -429,14 +408,12 @@ window.addEventListener('DOMContentLoaded', () => {
       qs('#servo-slider')?.noUiSlider?.set(+st.servo);
       qs('#flow-slider')?.noUiSlider?.set(+st.setpoint);
 
-      if(!manualMode){
-        qs('#energy-corredera-slider')?.noUiSlider?.set(st.energyCorredera ?? 0);
-        qs('#energy-angulo-slider')?.noUiSlider?.set(st.energyAngulo ?? 0);
-        qs('#energy-valvula-slider')?.noUiSlider?.set(st.energyValvula ?? 0);
-        // keep chart targets aligned with current positions
-        s1Target = +st.s1;
-        s2Target = +st.s2;
-      }
+      qs('#energy-corredera-slider')?.noUiSlider?.set(st.energyCorredera ?? 0);
+      qs('#energy-angulo-slider')?.noUiSlider?.set(st.energyAngulo ?? 0);
+      qs('#energy-valvula-slider')?.noUiSlider?.set(st.energyValvula ?? 0);
+      // keep chart targets aligned with current positions
+      s1Target = +st.s1;
+      s2Target = +st.s2;
 
       autoExec=!!st.autoExecEnabled;
       ui.badge.textContent=autoExec?'⏳ En ejecución automática':'✔ Sistema en espera';
