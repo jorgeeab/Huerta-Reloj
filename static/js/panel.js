@@ -51,10 +51,9 @@ window.addEventListener('DOMContentLoaded', () => {
     motors : qs('#robot-motors'),
     cam    : qs('#cameraFeed'),
     ffCard : qs('#ff-card'),
-    ffWrap : qs('#ff-switch-wrap'),
-    manualBtn: qs('#manual-toggle'),
-    manualBadge: qs('#manual-badge')
+    ffWrap : qs('#ff-switch-wrap')
   };
+  const manualBtns = qsa('.manual-toggle');
   const energyWraps = qsa('.energy-wrap');
   // show energy controls by default; disabled state is managed later
   energyWraps.forEach(w=>w.style.display='');
@@ -288,10 +287,12 @@ window.addEventListener('DOMContentLoaded', () => {
   ui.btn.onclick=()=>api(`/control?ejec=${autoExec?0:1}`)
                     .then(refreshStatus).catch(alert);
 
-  ui.manualBtn?.addEventListener('click',()=>{
-    const next = manualMode ? 0 : 1;
-    apiJson('/entorno/actualizar_acciones',{manual_mode:next})
-      .then(refreshStatus).catch(e=>alert(e.message));
+  manualBtns.forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const next = manualMode ? 0 : 1;
+      apiJson('/entorno/actualizar_acciones',{manual_mode:next})
+        .then(refreshStatus).catch(e=>alert(e.message));
+    });
   });
 
   /* ===== Gráfica Flujo vs SP ================================ */
@@ -379,12 +380,9 @@ window.addEventListener('DOMContentLoaded', () => {
       const st = await api('/status');
       lastStatus = st;
       manualMode = !!st.manualMode;
-      if(ui.manualBadge){
-        ui.manualBadge.textContent = manualMode ? 'ON':'OFF';
-      }
-      if(ui.manualBtn){
-        ui.manualBtn.textContent = manualMode ? 'Desactivar modo manual':'Activar modo manual';
-      }
+      manualBtns.forEach(btn=>{
+        btn.textContent = manualMode ? 'Desactivar modo manual' : 'Activar modo manual';
+      });
       // ensure energy controls stay visible but toggle interactivity via disabled state
       energyWraps.forEach(w=>w.style.display='');
       const setDisabled = (sel,dis)=>{
