@@ -674,6 +674,11 @@ window.addEventListener('DOMContentLoaded', () => {
     tasks=await api('/api/tasks');
     /* régimen actual (tab reg) */
     const filt=currentRegId?tasks.filter(t=>t.reg==currentRegId):tasks;
+    const title=qs('#currentRegName');
+    if(title){
+      const reg=regs.find(r=>r.id==currentRegId);
+      title.textContent=reg?`Régimen: ${reg.n}`:'';
+    }
     buildCalendar('#calendar',filt,'#weekSlider','#weekLabel','#initialDate');
     enableTaskClicks(filt,'detail','#calendar',false); enableEmptyCellClicks('calendar','detail',filt,'#weekSlider','#initialDate');
     /* todas las tareas (dashboard) */
@@ -811,6 +816,10 @@ window.addEventListener('DOMContentLoaded', () => {
   qs('#rg-id') ?.addEventListener('input', updateRgBtn);
   qs('#pl-save')?.addEventListener('click', savePlant);
   qs('#pl-del') ?.addEventListener('click', delPlant);
+  qs('#pl-reg') ?.addEventListener('change', () => {
+    currentRegId = val('#pl-reg') ? parseInt(val('#pl-reg'),10) : null;
+    loadCalendarTasks();
+  });
   qs('#pl-copy-current')?.addEventListener('click', () => {
     const s1 = lastStatus?.s1 ?? lastStatus?.servo1 ??
                qs('#s1-slider')?.noUiSlider?.get();
