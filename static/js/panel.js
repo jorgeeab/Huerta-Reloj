@@ -184,19 +184,20 @@ window.addEventListener('DOMContentLoaded', () => {
   mk('#flow-slider',0,30,0.1,0,'#flow-val',
      v=>api(`/control?flow=${v}`));
 
-  const mkEnergy = (sel,out,comp)=>{
+  const mkEnergy = (sel,out,btn,comp)=>{
     const el = qs(sel); if(!el) return;
     noUiSlider.create(el,{start:0,step:1,range:{min:-255,max:255}});
     el.noUiSlider.on('update',(_,__,v)=> qs(out).textContent=Math.round(v));
-    el.noUiSlider.on('change',(_,__,v)=>{
+    qs(btn)?.addEventListener('click',()=>{
+      const v = Math.round(el.noUiSlider.get());
       const d={manual_mode:1,motor_energies:{}};
-      d.motor_energies[comp]=Math.round(v);
+      d.motor_energies[comp]=v;
       apiJson('/entorno/actualizar_acciones',d).catch(console.warn);
     });
   };
-  mkEnergy('#energy-corredera-slider','#energy-corredera-val','corredera');
-  mkEnergy('#energy-angulo-slider','#energy-angulo-val','angulo');
-  mkEnergy('#energy-valvula-slider','#energy-valvula-val','valvula');
+  mkEnergy('#energy-corredera-slider','#energy-corredera-val','#energy-corredera-btn','corredera');
+  mkEnergy('#energy-angulo-slider','#energy-angulo-val','#energy-angulo-btn','angulo');
+  mkEnergy('#energy-valvula-slider','#energy-valvula-val','#energy-valvula-btn','valvula');
 
   /* mostrar gráficas al abrir config PID */
   const pidS1Col = $('#pidS1Collapse');
@@ -394,6 +395,8 @@ window.addEventListener('DOMContentLoaded', () => {
       ['#s1-slider','#s2-slider','#servo-slider','#flow-slider'].forEach(sel=>setDisabled(sel,manualMode));
       ['#energy-corredera-slider','#energy-angulo-slider','#energy-valvula-slider']
         .forEach(sel=>setDisabled(sel,!manualMode));
+      ['#energy-corredera-btn','#energy-angulo-btn','#energy-valvula-btn']
+        .forEach(sel=>{const b=qs(sel); if(b) b.disabled=!manualMode;});
       pidSw.checked = !!st.pidOn;
       if(pidBadge){
         pidBadge.textContent = st.pidOn ? 'ON':'OFF';
@@ -426,13 +429,7 @@ window.addEventListener('DOMContentLoaded', () => {
       qs('#servo-slider')?.noUiSlider?.set(+st.servo);
       qs('#flow-slider')?.noUiSlider?.set(+st.setpoint);
 
-      if(manualMode){
-        // manual mode disables energy outputs
-        qs('#energy-corredera-slider')?.noUiSlider?.set(0);
-        qs('#energy-angulo-slider')?.noUiSlider?.set(0);
-        qs('#energy-valvula-slider')?.noUiSlider?.set(0);
-      }else{
-        // reflect controller energy when not in manual mode
+      if(!manualMode){
         qs('#energy-corredera-slider')?.noUiSlider?.set(st.energyCorredera ?? 0);
         qs('#energy-angulo-slider')?.noUiSlider?.set(st.energyAngulo ?? 0);
         qs('#energy-valvula-slider')?.noUiSlider?.set(st.energyValvula ?? 0);
