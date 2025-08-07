@@ -53,7 +53,12 @@ window.addEventListener('DOMContentLoaded', () => {
     ffCard : qs('#ff-card'),
     ffWrap : qs('#ff-switch-wrap')
   };
-  const manualBtns = qsa('.manual-toggle');
+  const manualToggles = {
+    corredera: qs('#manual-corredera-toggle'),
+    angulo: qs('#manual-angulo-toggle'),
+    valvula: qs('#manual-valvula-toggle')
+  };
+  const manualState = {corredera:false, angulo:false, valvula:false};
   const energyWraps = qsa('.energy-wrap');
   // show energy controls by default; disabled state is managed later
   energyWraps.forEach(w=>w.style.display='');
@@ -287,10 +292,13 @@ window.addEventListener('DOMContentLoaded', () => {
   ui.btn.onclick=()=>api(`/control?ejec=${autoExec?0:1}`)
                     .then(refreshStatus).catch(alert);
 
-  manualBtns.forEach(btn=>{
+  Object.entries(manualToggles).forEach(([comp,btn])=>{
+    if(!btn) return;
     btn.addEventListener('click',()=>{
-      const next = manualMode ? 0 : 1;
-      apiJson('/entorno/actualizar_acciones',{manual_mode:next})
+      manualState[comp] = !manualState[comp];
+      btn.textContent = manualState[comp] ? 'Desactivar modo manual' : 'Activar modo manual';
+      const manual_mode = Object.values(manualState).some(Boolean) ? 1 : 0;
+      apiJson('/entorno/actualizar_acciones',{manual_mode})
         .then(refreshStatus).catch(e=>alert(e.message));
     });
   });
@@ -380,9 +388,13 @@ window.addEventListener('DOMContentLoaded', () => {
       const st = await api('/status');
       lastStatus = st;
       manualMode = !!st.manualMode;
-      manualBtns.forEach(btn=>{
-        btn.textContent = manualMode ? 'Desactivar modo manual' : 'Activar modo manual';
-      });
+      if(!manualMode){
+        Object.keys(manualState).forEach(comp=>{
+          manualState[comp]=false;
+          const btn = manualToggles[comp];
+          if(btn) btn.textContent='Activar modo manual';
+        });
+      }
       // ensure energy controls stay visible but toggle interactivity via disabled state
       energyWraps.forEach(w=>w.style.display='');
       const setDisabled = (sel,dis)=>{
@@ -391,10 +403,13 @@ window.addEventListener('DOMContentLoaded', () => {
         else { el.removeAttribute('disabled'); }
       };
       ['#s1-slider','#s2-slider','#servo-slider','#flow-slider'].forEach(sel=>setDisabled(sel,manualMode));
-      ['#energy-corredera-slider','#energy-angulo-slider','#energy-valvula-slider']
-        .forEach(sel=>setDisabled(sel,!manualMode));
-      ['#energy-corredera-btn','#energy-angulo-btn','#energy-valvula-btn']
-        .forEach(sel=>{const b=qs(sel); if(b) b.disabled=!manualMode;});
+      Object.entries(manualState).forEach(([comp,active])=>{
+        setDisabled(`#energy-${comp}-slider`, !manualMode || !active);
+        const b = qs(`#energy-${comp}-btn`);
+        if(b) b.disabled = !manualMode || !active;
+        const btn = manualToggles[comp];
+        if(btn) btn.textContent = active ? 'Desactivar modo manual' : 'Activar modo manual';
+      });
       pidSw.checked = !!st.pidOn;
       if(pidBadge){
         pidBadge.textContent = st.pidOn ? 'ON':'OFF';
