@@ -390,41 +390,51 @@ window.addEventListener('DOMContentLoaded', () => {
       const st = await api('/status');
       lastStatus = st;
       manualMode = !!st.manualMode;
+      // update component manual states from backend if provided
+      manualState.corredera = st.manualCorredera ?? manualState.corredera;
+      manualState.angulo    = st.manualAngulo    ?? manualState.angulo;
+      manualState.valvula   = st.manualValvula   ?? manualState.valvula;
+
       if(!manualMode){
-      Object.keys(manualState).forEach(comp=>{
-        manualState[comp]=false;
+        Object.keys(manualState).forEach(comp=>{
+          manualState[comp]=false;
+          const btn = manualToggles[comp];
+          if(btn){
+            btn.textContent='Activar modo manual';
+            btn.className='btn btn-sm btn-secondary manual-toggle mb-2';
+          }
+        });
+      }
+
+      // ensure energy controls stay visible but toggle interactivity via disabled state
+      energyWraps.forEach(w=>w.style.display='');
+      const setDisabled = (sel,dis)=>{
+        const el = qs(sel); if(!el || !el.noUiSlider) return;
+        if(dis){ el.setAttribute('disabled',true); }
+        else { el.removeAttribute('disabled'); }
+        el.classList.toggle('disabled-setup',dis);
+      };
+
+      // disable only the sliders whose components are in manual mode
+      setDisabled('#s1-slider', manualMode && manualState.corredera);
+      setDisabled('#s2-slider', manualMode && manualState.angulo);
+      setDisabled('#servo-slider', manualMode && manualState.valvula);
+      setDisabled('#flow-slider', manualMode && manualState.valvula);
+
+      Object.entries(manualState).forEach(([comp,active])=>{
+        const energySel = `#energy-${comp}-slider`;
+        const enabled = manualMode && active;
+        setDisabled(energySel, !enabled);
+        qs(energySel)?.classList.toggle('active-energy', enabled);
         const btn = manualToggles[comp];
         if(btn){
-          btn.textContent='Activar modo manual';
-          btn.className='btn btn-sm btn-secondary manual-toggle mb-2';
+          btn.textContent = active ? 'Desactivar modo manual' : 'Activar modo manual';
+          btn.className = `btn btn-sm btn-${active?'primary':'secondary'} manual-toggle mb-2`;
         }
+        const energyBadge = qs(`#energy-${comp}-val`);
+        if(energyBadge)
+          energyBadge.className = `badge badge-${enabled?'info':'secondary'}`;
       });
-    }
-    // ensure energy controls stay visible but toggle interactivity via disabled state
-    energyWraps.forEach(w=>w.style.display='');
-    const setDisabled = (sel,dis)=>{
-      const el = qs(sel); if(!el || !el.noUiSlider) return;
-      if(dis){ el.setAttribute('disabled',true); }
-      else { el.removeAttribute('disabled'); }
-    };
-    ['#s1-slider','#s2-slider','#servo-slider','#flow-slider'].forEach(sel=>{
-      setDisabled(sel,manualMode);
-      qs(sel)?.classList.toggle('disabled-setup',manualMode);
-    });
-    Object.entries(manualState).forEach(([comp,active])=>{
-      const energySel = `#energy-${comp}-slider`;
-      const enabled = manualMode && active;
-      setDisabled(energySel, !enabled);
-      qs(energySel)?.classList.toggle('active-energy', enabled);
-      const btn = manualToggles[comp];
-      if(btn){
-        btn.textContent = active ? 'Desactivar modo manual' : 'Activar modo manual';
-        btn.className = `btn btn-sm btn-${active?'primary':'secondary'} manual-toggle mb-2`;
-      }
-      const energyBadge = qs(`#energy-${comp}-val`);
-      if(energyBadge)
-        energyBadge.className = `badge badge-${enabled?'info':'secondary'}`;
-    });
     ['#s1-val','#s2-val','#servo-val'].forEach(sel=>{
       const b = qs(sel);
       if(b) b.className = `badge badge-${manualMode?'secondary':'light'}`;
@@ -455,15 +465,18 @@ window.addEventListener('DOMContentLoaded', () => {
       qs('#s2-real').textContent    = `${(+st.s2).toFixed(0)}°`;
       qs('#flow-real').textContent  = `${(+st.flow).toFixed(1)} ml/s`;
 
-      // sync sliders with real readings so UI and charts share the same source
-      qs('#s1-slider')?.noUiSlider?.set(+st.s1);
-      qs('#s2-slider')?.noUiSlider?.set(+st.s2);
-      qs('#servo-slider')?.noUiSlider?.set(+st.servo);
-      qs('#flow-slider')?.noUiSlider?.set(+st.setpoint);
+      // sync sliders with real readings only in automatic mode so user
+      // adjustments remain visible during manual control
+      if(!manualMode){
+        qs('#s1-slider')?.noUiSlider?.set(+st.s1);
+        qs('#s2-slider')?.noUiSlider?.set(+st.s2);
+        qs('#servo-slider')?.noUiSlider?.set(+st.servo);
+        qs('#flow-slider')?.noUiSlider?.set(+st.setpoint);
 
-       qs('#energy-corredera-slider')?.noUiSlider?.set(st.energyCorredera ?? 0);
-       qs('#energy-angulo-slider')?.noUiSlider?.set(st.energyAngulo ?? 0);
-       qs('#energy-valvula-slider')?.noUiSlider?.set(st.energyValvula ?? 0);
+        qs('#energy-corredera-slider')?.noUiSlider?.set(st.energyCorredera ?? 0);
+        qs('#energy-angulo-slider')?.noUiSlider?.set(st.energyAngulo ?? 0);
+        qs('#energy-valvula-slider')?.noUiSlider?.set(st.energyValvula ?? 0);
+      }
        if(!manualMode){
         // keep chart targets aligned with current positions
         s1Target = +st.s1;
