@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, redirect, url_for
+from flask import Flask, request, jsonify, render_template, redirect, url_for, Response
 import threading
 import webbrowser
 from basic_gym_env.basic_env import BasicEnv
@@ -10,8 +10,33 @@ from protocolos import Protocolo
 import os
 import json
 from pathlib import Path
+import cv2
 
 app = Flask(__name__)
+
+# ---- Camera streaming -----------------------------------------------------
+camera = cv2.VideoCapture(0)
+
+
+def generate_frames():
+    """Capture frames from the default camera and yield them as JPEG."""
+    while True:
+        success, frame = camera.read()
+        if not success:
+            continue
+        ret, buffer = cv2.imencode('.jpg', frame)
+        if not ret:
+            continue
+        frame_bytes = buffer.tobytes()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+
+
+@app.route('/video_feed')
+def video_feed():
+    """Video streaming route compatible con la etiqueta <img>."""
+    return Response(generate_frames(),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
 
 # ----- Simple JSON storage for demo endpoints -----
 DATA_DIR = Path('data')
