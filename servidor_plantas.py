@@ -84,6 +84,9 @@ class ServidorFlask:
         # Inicializamos el entorno y el gestor de plantas
         self.env = BasicEnv(port='COM5', baudrate=115200, logger=self.log)
         self.manager = PlantasManager()
+        self.manual_corredera = False
+        self.manual_angulo = False
+        self.manual_valvula = False
 
     def log(self, message):
         timestamp = datetime.now().strftime("%H:%M:%S")
@@ -99,12 +102,29 @@ class ServidorFlask:
             self.log("Ingresando a actualizar_acciones")
             self.log(f"Data recibida: {data}")
 
-            # Actualizar el modo manual si se proporciona
+            # Actualizar modos manuales individuales
+            flags_changed = False
+            for comp in ('corredera', 'angulo', 'valvula'):
+                key = f'manual_{comp}'
+                val = data.get(key)
+                if val is not None:
+                    setattr(self, key, bool(int(val)))
+                    self.log(f"{key} actualizado a {val}")
+                    flags_changed = True
+
             manual_mode = data.get('manual_mode')
-            if manual_mode is not None:
+            if flags_changed:
+                manual_mode = int(self.manual_corredera or self.manual_angulo or self.manual_valvula)
+                self.env.set_manual_mode(manual_mode)
+                self.log(f"manual_mode actualizado a {manual_mode}")
+            elif manual_mode is not None:
                 self.env.set_manual_mode(int(manual_mode))
                 self.log(f"manual_mode actualizado a {manual_mode}")
-
+                if int(manual_mode) == 0:
+                    self.manual_corredera = False
+                    self.manual_angulo = False
+                    self.manual_valvula = False
+            manual_mode = self.env.manual_mode
             # Configurar joypad si se proporciona
             joypad_action = data.get('joypad_action')
             if joypad_action:
@@ -759,12 +779,17 @@ def status():
     obs_dict = dict(zip(servidor.env.variable_names, obs_list))
 
     data = {
-        'flow': obs_dict.get('inputV', 0),
+        # Valores de sensores leídos directamente del Arduino
+        'flow': obs_dict.get('flowVolume', 0),
         'setpoint': servidor.env.current_action[6],
-        'servo': obs_dict.get('inputA', 0),
-        's1': obs_dict.get('inputX', 0),
-        's2': obs_dict.get('inputA', 0),
+        'servo': obs_dict.get('inputV', 0),
+        'x': obs_dict.get('inputX', 0),
+        'a': obs_dict.get('inputA', 0),
+        # Estados de modo manual por actuador
         'manualMode': servidor.env.manual_mode,
+        'manualCorredera': int(servidor.manual_corredera),
+        'manualAngulo': int(servidor.manual_angulo),
+        'manualValvula': int(servidor.manual_valvula),
         'pidOn': servidor.env.manual_mode == 0,
         'ffOn': False,
         'Kp': servidor.env.current_action[13],
