@@ -59,6 +59,10 @@ window.addEventListener('DOMContentLoaded', () => {
     valvula: qs('#manual-valvula-toggle')
   };
   const manualState = {corredera:false, angulo:false, valvula:false};
+  const dragging = {
+    s1:false, s2:false, servo:false, flow:false,
+    energyCorredera:false, energyAngulo:false, energyValvula:false
+  };
   const energyWraps = qsa('.energy-wrap');
   // show energy controls by default; disabled state is managed later
   energyWraps.forEach(w=>w.style.display='');
@@ -172,38 +176,41 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   /* ===== Sliders (noUiSlider) ================================ */
-  const mk = (sel,min,max,step,start,out,cb)=>{
-    noUiSlider.create(qs(sel),{start,step,range:{min,max}});
-    qs(sel).noUiSlider.on('update',(_,__,v)=>
+  const mk = (sel,min,max,step,start,out,cb,dragKey)=>{
+    const el = qs(sel);
+    noUiSlider.create(el,{start,step,range:{min,max}});
+    el.noUiSlider.on('start',()=>{ if(dragKey) dragging[dragKey]=true; });
+    el.noUiSlider.on('end',()=>{ if(dragKey) dragging[dragKey]=false; });
+    el.noUiSlider.on('update',(_,__,v)=>
       qs(out).textContent = (+v).toFixed(step<1 ? 1 : 0)
     );
-    if(cb) qs(sel).noUiSlider.on('change',(_,__,v)=>cb(+v));
+    if(cb) el.noUiSlider.on('change',(_,__,v)=>cb(+v));
   };
   mk('#servo-slider',50,180,1,170,'#servo-val',
-     v=>api(`/control?servo=${Math.round(v)}`).then(refreshStatus));
+     v=>api(`/control?servo=${Math.round(v)}`).then(refreshStatus),'servo');
   mk('#s1-slider',0,180,1,90,'#s1-val',
-     v=>{ s1Target=v; api(`/control?servo=${Math.round(v)}&pin=1`).then(refreshStatus); });
+     v=>{ s1Target=v; api(`/control?servo=${Math.round(v)}&pin=1`).then(refreshStatus); },'s1');
   mk('#s2-slider',0,180,1,90,'#s2-val',
-     v=>{ s2Target=v; api(`/control?servo=${Math.round(v)}&pin=2`).then(refreshStatus); });
+     v=>{ s2Target=v; api(`/control?servo=${Math.round(v)}&pin=2`).then(refreshStatus); },'s2');
   mk('#flow-slider',0,30,0.1,0,'#flow-val',
-     v=>api(`/control?flow=${v}`).then(refreshStatus));
+     v=>api(`/control?flow=${v}`).then(refreshStatus),'flow');
 
-  const mkEnergy = (sel,out,comp)=>{
+  const mkEnergy = (sel,out,comp,dragKey)=>{
     const el = qs(sel); if(!el) return;
     noUiSlider.create(el,{start:0,step:1,range:{min:-255,max:255}});
+    el.noUiSlider.on('start',()=>{ if(dragKey) dragging[dragKey]=true; });
+    el.noUiSlider.on('end',()=>{ if(dragKey) dragging[dragKey]=false; });
     el.noUiSlider.on('update',(_,__,v)=> qs(out).textContent=Math.round(v));
     el.noUiSlider.on('change',(_,__,v)=>{
       const val = Math.round(v);
       const d={motor_energies:{}};
       d.motor_energies[comp]=val;
-      apiJson('/entorno/actualizar_acciones',d)
-        .then(refreshStatus)
-        .catch(console.warn);
+      apiJson('/entorno/actualizar_acciones',d).then(refreshStatus).catch(console.warn);
     });
   };
-  mkEnergy('#energy-corredera-slider','#energy-corredera-val','corredera');
-  mkEnergy('#energy-angulo-slider','#energy-angulo-val','angulo');
-  mkEnergy('#energy-valvula-slider','#energy-valvula-val','valvula');
+  mkEnergy('#energy-corredera-slider','#energy-corredera-val','corredera','energyCorredera');
+  mkEnergy('#energy-angulo-slider','#energy-angulo-val','angulo','energyAngulo');
+  mkEnergy('#energy-valvula-slider','#energy-valvula-val','valvula','energyValvula');
 
   /* mostrar gráficas al abrir config PID */
   const pidS1Col = $('#pidS1Collapse');
@@ -406,8 +413,6 @@ window.addEventListener('DOMContentLoaded', () => {
           }
         });
       }
-
-      // ensure energy controls stay visible but toggle interactivity via disabled state
       energyWraps.forEach(w=>w.style.display='');
       const setDisabled = (sel,dis)=>{
         const el = qs(sel); if(!el || !el.noUiSlider) return;
@@ -416,11 +421,28 @@ window.addEventListener('DOMContentLoaded', () => {
         el.classList.toggle('disabled-setup',dis);
       };
 
-      // disable only the sliders whose components are in manual mode
+      if(!manualMode && !dragging.s1)   qs('#s1-slider')?.noUiSlider?.set(+st.x);
+      if(!manualMode && !dragging.s2)   qs('#s2-slider')?.noUiSlider?.set(+st.a);
+      if(!manualMode && !dragging.servo)qs('#servo-slider')?.noUiSlider?.set(+st.servo);
+      if(!manualMode && !dragging.flow) qs('#flow-slider')?.noUiSlider?.set(+st.setpoint);
+
+      const energyCanSet = (compKey, dragKey) => {
+        const isCompManual = compKey==='corredera' ? manualState.corredera
+                           : compKey==='angulo'    ? manualState.angulo
+                           :                         manualState.valvula;
+        return !(manualMode && isCompManual) && !dragging[dragKey];
+      };
+      if(energyCanSet('corredera','energyCorredera'))
+        qs('#energy-corredera-slider')?.noUiSlider?.set(st.energyCorredera ?? 0);
+      if(energyCanSet('angulo','energyAngulo'))
+        qs('#energy-angulo-slider')?.noUiSlider?.set(st.energyAngulo ?? 0);
+      if(energyCanSet('valvula','energyValvula'))
+        qs('#energy-valvula-slider')?.noUiSlider?.set(st.energyValvula ?? 0);
+
       setDisabled('#s1-slider', manualMode && manualState.corredera);
       setDisabled('#s2-slider', manualMode && manualState.angulo);
       setDisabled('#servo-slider', manualMode && manualState.valvula);
-      setDisabled('#flow-slider', manualMode && manualState.valvula);
+      setDisabled('#flow-slider',  manualMode && manualState.valvula);
 
       Object.entries(manualState).forEach(([comp,active])=>{
         const energySel = `#energy-${comp}-slider`;
@@ -436,11 +458,11 @@ window.addEventListener('DOMContentLoaded', () => {
         if(energyBadge)
           energyBadge.className = `badge badge-${enabled?'info':'secondary'}`;
       });
-    ['#s1-val','#s2-val','#servo-val'].forEach(sel=>{
-      const b = qs(sel);
-      if(b) b.className = `badge badge-${manualMode?'secondary':'light'}`;
-    });
-    pidSw.checked = !!st.pidOn;
+      ['#s1-val','#s2-val','#servo-val'].forEach(sel=>{
+        const b = qs(sel);
+        if(b) b.className = `badge badge-${manualMode?'secondary':'light'}`;
+      });
+      pidSw.checked = !!st.pidOn;
       if(pidBadge){
         pidBadge.textContent = st.pidOn ? 'ON':'OFF';
         pidBadge.className = `badge badge-${st.pidOn?'success':'secondary'} ml-1`;
@@ -465,24 +487,11 @@ window.addEventListener('DOMContentLoaded', () => {
       qs('#s1-real').textContent    = `${(+st.x).toFixed(0)}°`;
       qs('#s2-real').textContent    = `${(+st.a).toFixed(0)}°`;
       qs('#flow-real').textContent  = `${(+st.flow).toFixed(1)} ml/s`;
-
-      // sync sliders with real readings only in automatic mode so user
-      // adjustments remain visible during manual control
       if(!manualMode){
-        qs('#s1-slider')?.noUiSlider?.set(+st.x);
-        qs('#s2-slider')?.noUiSlider?.set(+st.a);
-        qs('#servo-slider')?.noUiSlider?.set(+st.servo);
-        qs('#flow-slider')?.noUiSlider?.set(+st.setpoint);
-
-        qs('#energy-corredera-slider')?.noUiSlider?.set(st.energyCorredera ?? 0);
-        qs('#energy-angulo-slider')?.noUiSlider?.set(st.energyAngulo ?? 0);
-        qs('#energy-valvula-slider')?.noUiSlider?.set(st.energyValvula ?? 0);
-      }
-       if(!manualMode){
         // keep chart targets aligned with current positions
         s1Target = +st.x;
         s2Target = +st.a;
-       }
+      }
 
       autoExec=!!st.autoExecEnabled;
       ui.badge.textContent=autoExec?'⏳ En ejecución automática':'✔ Sistema en espera';
