@@ -764,10 +764,8 @@ def api_logs():
 # --- Compatibilidad con la interfaz avanzada -----------------
 @app.route('/status')
 def status():
-    """Devuelve un resumen del estado actual del entorno."""
     obs = servidor.env.get_observation()
     if obs is None:
-        # Intentar generar una observación realizando un paso
         try:
             servidor.env.step()
             obs = servidor.env.get_observation()
@@ -779,31 +777,38 @@ def status():
     obs_dict = dict(zip(servidor.env.variable_names, obs_list))
 
     data = {
-        # Valores de sensores leídos directamente del Arduino
-        'flow': obs_dict.get('flowVolume', 0),
-        'setpoint': servidor.env.current_action[6],
-        'servo': obs_dict.get('inputV', 0),
-        'x': obs_dict.get('inputX', 0),
-        'a': obs_dict.get('inputA', 0),
-        # Estados de modo manual por actuador
-        'manualMode': servidor.env.manual_mode,
+        'flow'          : obs_dict.get('flowVolume', 0),
+        'setpoint'      : servidor.env.current_action[6],
+        'servo'         : obs_dict.get('inputV', 0),
+        'x'             : obs_dict.get('inputX', 0),
+        'a'             : obs_dict.get('inputA', 0),
+
+        'manualMode'    : servidor.env.manual_mode,
         'manualCorredera': int(servidor.manual_corredera),
-        'manualAngulo': int(servidor.manual_angulo),
-        'manualValvula': int(servidor.manual_valvula),
-        'pidOn': servidor.env.manual_mode == 0,
-        'ffOn': False,
-        'Kp': servidor.env.current_action[13],
-        'Ki': servidor.env.current_action[14],
-        'Kd': servidor.env.current_action[15],
-        'KpC': servidor.env.current_action[7],
-        'KiC': servidor.env.current_action[8],
-        'KdC': servidor.env.current_action[9],
-        'KpA': servidor.env.current_action[10],
-        'KiA': servidor.env.current_action[11],
-        'KdA': servidor.env.current_action[12],
-        'volReq': servidor.env.current_action[6],
-        'volDispTask': 0,
-        'volDispAcumDay': 0,
+        'manualAngulo'   : int(servidor.manual_angulo),
+        'manualValvula'  : int(servidor.manual_valvula),
+
+        'pidOn'         : servidor.env.manual_mode == 0,
+        'ffOn'          : False,
+
+        'Kp'  : servidor.env.current_action[13] if servidor.env.mode=='virtual' else 0,
+        'Ki'  : servidor.env.current_action[14] if servidor.env.mode=='virtual' else 0,
+        'Kd'  : servidor.env.current_action[15] if servidor.env.mode=='virtual' else 0,
+        'KpC' : servidor.env.current_action[7],
+        'KiC' : servidor.env.current_action[8],
+        'KdC' : servidor.env.current_action[9],
+        'KpA' : servidor.env.current_action[10],
+        'KiA' : servidor.env.current_action[11],
+        'KdA' : servidor.env.current_action[12],
+
+        'energyCorredera': int(servidor.env.current_action[2]),
+        'energyAngulo'   : int(servidor.env.current_action[1]),
+        'energyValvula'  : int(servidor.env.current_action[3]),
+
+        'volReq'        : servidor.env.current_action[6],
+        'volDispTask'   : 0,
+        'volDispAcumDay': float(obs_dict.get('flowVolume', 0)),
+
         'autoExecEnabled': False,
     }
     return jsonify(data)

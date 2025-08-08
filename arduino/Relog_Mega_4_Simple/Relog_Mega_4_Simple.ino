@@ -362,14 +362,14 @@ void enviarDatos() {
                         String(inputA, 2) + "," +
                         String(volumen, 2) + "," +
                         String(flow, 2) + "," +
-                        String(XLimit_State, 2) + "," +
-                        String(ALimit_State, 2) + "," +
+                        String(XLimit_State) + "," +
+                        String(ALimit_State) + "," +
                         String(resetX ? 1 : 0) + "," +
                         String(resetA ? 1 : 0) + "," +
                         String(EMX, 2) + "," +
                         String(EMA, 2) + "," +
                         String(EMV, 2) + "," +
-                        String(modoManual, 2) + "," +
+                        String(modoManual) + "," +
                         String(kpX, 2) + "," +
                         String(kiX, 2) + "," +
                         String(kdX, 2) + "," +

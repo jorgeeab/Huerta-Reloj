@@ -29,50 +29,51 @@ class BasicEnv(gym.Env):
         self.tareas_manager = RobotTasksManager(archivo_tareas)
 
         # Definir espacios de acción y observación
+        # Índices de acción alineados con Arduino.procesarComando()
         self.action_space = gym.spaces.Box(
             low=np.array([
-                0,      # [0] modoManual (0 o 1)
-                -255,   # [1] manualMotorA
-                -255,   # [2] manualMotorX
-                -255,   # [3] manualMotorV
+                0,      # [0] modoManual
+                -255,   # [1] EM_A
+                -255,   # [2] EM_X
+                -255,   # [3] EM_V
                 0,      # [4] X_Requerido
                 0,      # [5] A_Requerido
-                0,      # [6] Vel_Requerida
+                0,      # [6] Vol_requerido
                 0,      # [7] kpX
                 0,      # [8] kiX
                 0,      # [9] kdX
                 0,      # [10] kpA
                 0,      # [11] kiA
                 0,      # [12] kdA
-                0,      # [13] kpV
-                0,      # [14] kiV
-                0,      # [15] kdV
-                0,      # [16] resetMotorXFlag
-                0,      # [17] resetMotorAFlag
-                0,      # [18] stepsPerMM
-                0       # [19] stepsPerDegree
+                0,      # [13] resetVolumen
+                0,      # [14] resetMotorXFlag
+                0,      # [15] resetMotorAFlag
+                0,      # [16] stepsPerMM
+                0,      # [17] stepsPerDegree
+                0,      # [18] usarLectorVelocidad
+                0       # [19] reservado
             ]),
             high=np.array([
-                1,      # [0] modoManual
-                255,    # [1] manualMotorA
-                255,    # [2] manualMotorX
-                255,    # [3] manualMotorV
-                400,    # [4] X_Requerido
-                360,    # [5] A_Requerido
-                255,    # [6] Vel_Requerida
-                255,    # [7] kpX
-                255,    # [8] kiX
-                255,    # [9] kdX
-                255,    # [10] kpA
-                255,    # [11] kiA
-                255,    # [12] kdA
-                255,    # [13] kpV
-                255,    # [14] kiV
-                255,    # [15] kdV
-                1,      # [16] resetMotorXFlag
-                1,      # [17] resetMotorAFlag
-                10000,  # [18] stepsPerMM
-                10000   # [19] stepsPerDegree
+                1,       # [0] modoManual
+                255,     # [1] EM_A
+                255,     # [2] EM_X
+                255,     # [3] EM_V
+                400,     # [4] X_Requerido
+                360,     # [5] A_Requerido
+                100000,  # [6] Vol_requerido
+                255,     # [7] kpX
+                255,     # [8] kiX
+                255,     # [9] kdX
+                255,     # [10] kpA
+                255,     # [11] kiA
+                255,     # [12] kdA
+                1,       # [13] resetVolumen
+                1,       # [14] resetMotorXFlag
+                1,       # [15] resetMotorAFlag
+                10000,   # [16] stepsPerMM
+                10000,   # [17] stepsPerDegree
+                1,       # [18] usarLectorVelocidad
+                0        # [19] reservado
             ]),
             dtype=np.float32
         )
@@ -239,29 +240,19 @@ class BasicEnv(gym.Env):
                 self.logger(f"Unexpected error: {e}")
 
     def process_serial_line(self, line):
-        # Registrar la línea cruda recibida del Arduino
         self.logger(f"Arduino: {line}")
-
-        # Dividir la línea por comas
         values = line.strip().split(',')
 
         if len(values) not in (21, 24):
             self.logger(f"Error: expected 21 or 24 values, got {len(values)}")
             return
 
-        # Valores por defecto para el formato reducido
-        inputV = 0.0
-        calibrando_X = 0
-        calibrando_A = 0
-        kpV = kiV = kdV = 0.0
-
         try:
             if len(values) == 21:
-                # Formato sin parametros PID de la válvula
                 inputX = float(values[0])
                 inputA = float(values[1])
                 flowVolume = float(values[2])
-                inputV = float(values[3])
+                flowRate = float(values[3])
                 limite_X = int(float(values[4]))
                 limite_A = int(float(values[5]))
                 calibrando_X = int(float(values[6]))
@@ -279,67 +270,41 @@ class BasicEnv(gym.Env):
                 stepsPerMM = float(values[18])
                 stepsPerDegree = float(values[19])
                 flowCalibFactor = float(values[20])
-            else:
-                # Formato completo de 24 valores
-                inputX = float(values[0])
-                inputA = float(values[1])
-                inputV = float(values[2])
-                flowVolume = float(values[3])
-                limite_X = int(float(values[4]))
-                limite_A = int(float(values[5]))
-                calibrando_X = int(float(values[6]))
-                calibrando_A = int(float(values[7]))
-                manualMotorX = float(values[8])
-                manualMotorA = float(values[9])
-                manualMotorV = float(values[10])
-                modoManual = int(float(values[11]))
-                kpX = float(values[12])
-                kiX = float(values[13])
-                kdX = float(values[14])
-                kpA = float(values[15])
-                kiA = float(values[16])
-                kdA = float(values[17])
-                kpV = float(values[18])
-                kiV = float(values[19])
-                kdV = float(values[20])
-                stepsPerMM = float(values[21])
-                stepsPerDegree = float(values[22])
-                flowCalibFactor = float(values[23])
 
-            # Crear el array de observación
+                inputV = manualMotorV
+            else:
+                raise ValueError("Formato de 24 valores no implementado en Arduino actual")
+
             obs = np.array([
-                inputX,  # [0]
-                inputA,  # [1]
-                inputV,  # [2]
-                flowVolume,  # [3]
-                limite_X,  # [4]
-                limite_A,  # [5]
-                calibrando_X,  # [6]
-                calibrando_A,  # [7]
-                manualMotorX,  # [8]
-                manualMotorA,  # [9]
-                manualMotorV,  # [10]
-                modoManual,  # [11]
-                kpX,  # [12]
-                kiX,  # [13]
-                kdX,  # [14]
-                kpA,  # [15]
-                kiA,  # [16]
-                kdA,  # [17]
-                kpV,  # [18]
-                kiV,  # [19]
-                kdV,  # [20]
-                stepsPerMM,  # [21]
-                stepsPerDegree,  # [22]
-                flowCalibFactor  # [23]
+                inputX,            # [0]
+                inputA,            # [1]
+                inputV,            # [2]
+                flowVolume,        # [3]
+                limite_X,          # [4]
+                limite_A,          # [5]
+                calibrando_X,      # [6]
+                calibrando_A,      # [7]
+                manualMotorX,      # [8]
+                manualMotorA,      # [9]
+                manualMotorV,      # [10]
+                modoManual,        # [11]
+                kpX,               # [12]
+                kiX,               # [13]
+                kdX,               # [14]
+                kpA,               # [15]
+                kiA,               # [16]
+                kdA,               # [17]
+                0.0,               # [18] kpV (no disponible)
+                0.0,               # [19] kiV
+                0.0,               # [20] kdV
+                stepsPerMM,        # [21]
+                stepsPerDegree,    # [22]
+                flowCalibFactor    # [23]
             ], dtype=np.float32)
 
-            # Colocar la observación en la cola
             self.data_queue.put(obs)
-        except ValueError as e:
-            print(f"Value error: {e}")
         except Exception as e:
-            print(f"Unexpected error: {e}")
+            self.logger(f"process_serial_line error: {e}")
 
     def check_joystick_connection(self):
         pygame.joystick.quit()
@@ -415,10 +380,9 @@ class BasicEnv(gym.Env):
         print("Entrada del joypad deshabilitada.")
 
     def step(self, action=None):
-        # Procesar entrada del joypad solo si está habilitado
         if self.joypad_enabled:
             self.process_joystick_input()
-        # Si no se proporciona una acción, usar self.current_action
+
         if action is None:
             action = self.current_action
         else:
@@ -428,36 +392,35 @@ class BasicEnv(gym.Env):
             if self.ser is None or not self.ser.is_open:
                 self.connect_serial()
 
-            command_values = [
+            cmd = [
                 int(self.current_action[0]),   # modoManual
-                int(self.current_action[1]),   # manualMotorA
-                int(self.current_action[2]),   # manualMotorX
-                int(self.current_action[3]),   # manualMotorV
+                int(self.current_action[1]),   # EMA
+                int(self.current_action[2]),   # EMX
+                int(self.current_action[3]),   # EMV
                 float(self.current_action[4]), # X_Requerido
                 float(self.current_action[5]), # A_Requerido
-                float(self.current_action[6]), # Vel_Requerida
+                float(self.current_action[6]), # Vol_requerido
                 float(self.current_action[7]), # kpX
                 float(self.current_action[8]), # kiX
                 float(self.current_action[9]), # kdX
                 float(self.current_action[10]),# kpA
                 float(self.current_action[11]),# kiA
                 float(self.current_action[12]),# kdA
-                float(self.current_action[13]),# kpV
-                float(self.current_action[14]),# kiV
-                float(self.current_action[15]),# kdV
-                int(self.current_action[16]),  # resetMotorXFlag
-                int(self.current_action[17]),  # resetMotorAFlag
-                float(self.current_action[18]),# stepsPerMM
-                float(self.current_action[19]) # stepsPerDegree
+                int(self.current_action[13]),  # resetVolumen
+                int(self.current_action[14]),  # resetMotorXFlag
+                int(self.current_action[15]),  # resetMotorAFlag
+                float(self.current_action[16]),# stepsPerMM
+                float(self.current_action[17]),# stepsPerDegree
+                int(self.current_action[18]),  # usarLectorVelocidad
+                0                              # reservado
             ]
-
-            command_str = ','.join(map(str, command_values)) + '\n'
+            command_str = ','.join(map(str, cmd)) + '\n'
 
             try:
                 if self.ser:
                     self.ser.write(command_str.encode())
             except serial.SerialException as e:
-                print(f"Error al escribir en el puerto serial: {e}")
+                self.logger(f"Error al escribir en el puerto serial: {e}")
                 self.ser = None
 
             obs = self.get_observation()
@@ -468,8 +431,8 @@ class BasicEnv(gym.Env):
                 except queue.Empty:
                     waited += 1
             if obs is None:
-                # En ausencia de datos del robot, devuelve una observación por defecto
                 obs = np.zeros(self.observation_space.shape, dtype=np.float32)
+
         else:
             angle_rad = np.deg2rad(self.current_action[5])
             slide_pos = -(self.current_action[4] / 1000.0) * 0.2
@@ -503,11 +466,11 @@ class BasicEnv(gym.Env):
                 self.current_action[10],
                 self.current_action[11],
                 self.current_action[12],
-                self.current_action[13],
-                self.current_action[14],
-                self.current_action[15],
-                self.current_action[18],
-                self.current_action[19],
+                0.0,
+                0.0,
+                0.0,
+                self.current_action[16],
+                self.current_action[17],
                 1.0
             ], dtype=np.float32)
             self.last_obs = obs
@@ -515,6 +478,11 @@ class BasicEnv(gym.Env):
         self.simulation_time = round(time.time() - self.start_time, 1)
         reward = round(self.calculate_reward(obs), 1)
         self.store_step(obs, reward)
+
+        self.current_action[13] = 0
+        self.current_action[14] = 0
+        self.current_action[15] = 0
+
         return obs, reward, False, {}
 
     def calculate_reward(self, obs):
@@ -570,31 +538,24 @@ class BasicEnv(gym.Env):
         self.current_action[5] = round(setpoint_angle, 2)
 
     def set_valvula(self, setpoint_water):
+        # En el firmware, este índice se usa como volumen objetivo
         setpoint_water = np.clip(setpoint_water,
                                  self.action_space.low[6],
                                  self.action_space.high[6])
         self.current_action[6] = round(setpoint_water, 1)
 
-    # --- Nuevos métodos para control de volumen y calibraciones ---
+    # --- Volumen requerido & reset volumen ---
     def set_volumen_requerido(self, volumen):
-        """Configura el volumen de riego deseado."""
-        volumen = np.clip(volumen,
-                          self.action_space.low[6],
-                          self.action_space.high[6])
-        self.current_action[6] = round(volumen, 1)
+        self.set_valvula(volumen)
 
     def reset_volumen(self):
-        """Restablece el volumen acumulado en el controlador."""
-        # No existe un índice dedicado en la acción; por ahora se envía cero
-        self.current_action[6] = 0
+        self.current_action[13] = 1
 
     def set_steps_per_mm(self, steps):
-        """Ajusta la calibración de pasos por milímetro."""
-        self.current_action[18] = float(steps)
+        self.current_action[16] = float(steps)
 
     def set_steps_per_degree(self, steps):
-        """Ajusta la calibración de pasos por grado."""
-        self.current_action[19] = float(steps)
+        self.current_action[17] = float(steps)
 
     def set_energy_corredera(self, energia_corredera):
         energia_corredera = np.clip(energia_corredera,
@@ -615,19 +576,20 @@ class BasicEnv(gym.Env):
         self.current_action[3] = int(energia_valvula)
 
     def set_pid_corredera(self, kp, ki, kd):
-        self.current_action[7] = round(kp, 1)
-        self.current_action[8] = round(ki, 1)
-        self.current_action[9] = round(kd, 1)
+        self.current_action[7] = round(kp, 2)
+        self.current_action[8] = round(ki, 2)
+        self.current_action[9] = round(kd, 2)
 
     def set_pid_angulo(self, kp, ki, kd):
-        self.current_action[10] = round(kp, 1)
-        self.current_action[11] = round(ki, 1)
-        self.current_action[12] = round(kd, 1)
+        self.current_action[10] = round(kp, 2)
+        self.current_action[11] = round(ki, 2)
+        self.current_action[12] = round(kd, 2)
 
     def set_pid_valvula(self, kp, ki, kd):
-        self.current_action[13] = round(kp, 1)
-        self.current_action[14] = round(ki, 1)
-        self.current_action[15] = round(kd, 1)
+        if self.mode == 'virtual':
+            self.current_action[13] = round(kp, 2)
+            self.current_action[14] = round(ki, 2)
+            self.current_action[15] = round(kd, 2)
 
     def set_manual_mode(self, manual_mode):
         self.current_action[0] = int(manual_mode)
@@ -642,10 +604,13 @@ class BasicEnv(gym.Env):
         self.set_manual_mode(1)
 
     def calibrate_X(self, calibrate):
-        self.current_action[16] = int(calibrate)
+        self.current_action[14] = int(calibrate)
 
     def calibrate_A(self, calibrate):
-        self.current_action[17] = int(calibrate)
+        self.current_action[15] = int(calibrate)
+
+    def set_usar_lector_velocidad(self, usar):
+        self.current_action[18] = 1 if usar else 0
 
     def handle_key_press(self, key):
         """Update setpoints or energies based on a keyboard key press."""
