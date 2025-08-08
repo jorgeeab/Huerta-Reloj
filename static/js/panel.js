@@ -194,7 +194,7 @@ window.addEventListener('DOMContentLoaded', () => {
     el.noUiSlider.on('update',(_,__,v)=> qs(out).textContent=Math.round(v));
     el.noUiSlider.on('change',(_,__,v)=>{
       const val = Math.round(v);
-      const d={manual_mode:1,motor_energies:{}};
+      const d={motor_energies:{}};
       d.motor_energies[comp]=val;
       apiJson('/entorno/actualizar_acciones',d)
         .then(refreshStatus)
@@ -297,10 +297,11 @@ window.addEventListener('DOMContentLoaded', () => {
   Object.entries(manualToggles).forEach(([comp,btn])=>{
     if(!btn) return;
     btn.addEventListener('click',()=>{
-      manualState[comp] = !manualState[comp];
-      btn.textContent = manualState[comp] ? 'Desactivar modo manual' : 'Activar modo manual';
-      const manual_mode = Object.values(manualState).some(Boolean) ? 1 : 0;
-      apiJson('/entorno/actualizar_acciones',{manual_mode})
+      const cap = comp.charAt(0).toUpperCase()+comp.slice(1);
+      const current = lastStatus && lastStatus[`manual${cap}`];
+      const payload = {};
+      payload[`manual_${comp}`] = current ? 0 : 1;
+      apiJson('/entorno/actualizar_acciones',payload)
         .then(refreshStatus).catch(e=>alert(e.message));
     });
   });
@@ -461,15 +462,15 @@ window.addEventListener('DOMContentLoaded', () => {
       qs('#pid-kd-cur').textContent  = (+st.Kd).toFixed(1);
 
       qs('#servo-real').textContent = `${(+st.servo).toFixed(0)}°`;
-      qs('#s1-real').textContent    = `${(+st.s1).toFixed(0)}°`;
-      qs('#s2-real').textContent    = `${(+st.s2).toFixed(0)}°`;
+      qs('#s1-real').textContent    = `${(+st.x).toFixed(0)}°`;
+      qs('#s2-real').textContent    = `${(+st.a).toFixed(0)}°`;
       qs('#flow-real').textContent  = `${(+st.flow).toFixed(1)} ml/s`;
 
       // sync sliders with real readings only in automatic mode so user
       // adjustments remain visible during manual control
       if(!manualMode){
-        qs('#s1-slider')?.noUiSlider?.set(+st.s1);
-        qs('#s2-slider')?.noUiSlider?.set(+st.s2);
+        qs('#s1-slider')?.noUiSlider?.set(+st.x);
+        qs('#s2-slider')?.noUiSlider?.set(+st.a);
         qs('#servo-slider')?.noUiSlider?.set(+st.servo);
         qs('#flow-slider')?.noUiSlider?.set(+st.setpoint);
 
@@ -479,8 +480,8 @@ window.addEventListener('DOMContentLoaded', () => {
       }
        if(!manualMode){
         // keep chart targets aligned with current positions
-        s1Target = +st.s1;
-        s2Target = +st.s2;
+        s1Target = +st.x;
+        s2Target = +st.a;
        }
 
       autoExec=!!st.autoExecEnabled;
@@ -502,7 +503,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
       if(chartS1){
         dataS1.labels.push(tick);
-        dataS1.datasets[0].data.push(+st.s1);
+        dataS1.datasets[0].data.push(+st.x);
         dataS1.datasets[1].data.push(+s1Target);
         if(dataS1.labels.length>120){
           dataS1.labels.shift();
@@ -513,7 +514,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
       if(chartS2){
         dataS2.labels.push(tick);
-        dataS2.datasets[0].data.push(+st.s2);
+        dataS2.datasets[0].data.push(+st.a);
         dataS2.datasets[1].data.push(+s2Target);
         if(dataS2.labels.length>120){
           dataS2.labels.shift();
